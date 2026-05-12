@@ -178,10 +178,7 @@ class ConvertisseurApp(tk.Tk):
         threading.Thread(target=worker, daemon=True).start()
 
     def _update_progress(self, index: int, total: int, label: str) -> None:
-        if total <= 0:
-            pct = 0
-        else:
-            pct = int(min(100, max(0, round(100 * index / total))))
+        pct = 0 if total <= 0 else int(min(100, max(0, round(100 * index / total))))
         self._progress["value"] = pct
         self._lbl_progress.config(text=f"{index}/{total} — {label}")
 

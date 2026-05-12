@@ -8,8 +8,8 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 # Extensions traitées par le convertisseur (minuscules)
 SUPPORTED_EXTENSIONS: frozenset[str] = frozenset(

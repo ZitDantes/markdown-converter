@@ -5,11 +5,26 @@ Logique de conversion : MarkItDown en priorité, Pandoc en secours si disponible
 from __future__ import annotations
 
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
+from utils import (
+    SUPPORTED_EXTENSIONS,
+    clean_markdown_body,
+    find_pandoc,
+    format_warning_for_extension,
+    is_effectively_empty_markdown,
+    merge_file_lists,
+    normalize_extension,
+    pandoc_from_format_for_extension,
+    run_pandoc_to_markdown,
+    unique_output_md_path,
+    yaml_scalar_double_quoted,
+)
 
 
 def _load_markitdown_class() -> Any:
@@ -28,21 +43,6 @@ def _load_markitdown_class() -> Any:
             f"Détail : {e}"
         ) from e
     return MarkItDownCls
-
-
-from utils import (
-    SUPPORTED_EXTENSIONS,
-    clean_markdown_body,
-    find_pandoc,
-    format_warning_for_extension,
-    is_effectively_empty_markdown,
-    merge_file_lists,
-    normalize_extension,
-    pandoc_from_format_for_extension,
-    run_pandoc_to_markdown,
-    unique_output_md_path,
-    yaml_scalar_double_quoted,
-)
 
 
 class ConversionStatus(str, Enum):
