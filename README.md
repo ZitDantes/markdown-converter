@@ -166,6 +166,28 @@ Objectif : produire une **application autonome** (`.app`) pour des utilisateurs 
 
 L’API de `converter.py` (callbacks `on_log` / `on_progress`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier.
 
+### Lint et formatage (ruff)
+
+Le projet utilise [ruff](https://docs.astral.sh/ruff/) pour le **lint** et le **formatage** (configuration dans [`pyproject.toml`](pyproject.toml)). C’est un seul outil pour les deux usages, configuré pour cibler Python 3.10+.
+
+Installation des dépendances de développement :
+
+```bash
+source .venv/bin/activate
+python3 -m pip install -r requirements-dev.txt
+```
+
+Commandes courantes :
+
+```bash
+ruff check .            # vérifier le lint
+ruff check . --fix      # corriger automatiquement ce qui peut l’être
+ruff format .           # appliquer le formatage
+ruff format --check .   # vérifier le formatage sans modifier
+```
+
+Toute modification doit garder `ruff check .` et `ruff format --check .` verts avant push.
+
 ### Prérequis côté build
 
 - Un Mac avec **Python 3.10+** et **Tkinter** (sur Homebrew : `python@3.12` **et** `python-tk@3.12`, comme pour le développement).
