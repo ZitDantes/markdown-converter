@@ -1,6 +1,6 @@
 # Convertisseur Markdown IA (MVP)
 
-> **Licence en cours de définition** — Ce dépôt est public sur GitHub, mais **aucune licence open source n’a encore été formalisée** (pas de fichier `LICENSE` à la racine). Tant que ce n’est pas le cas, le code reste par défaut **« tous droits réservés »** (*All rights reserved*) du point de vue du droit d’auteur : toute réutilisation ou redistribution nécessite une autorisation explicite du titulaire des droits. Suivi : [PLO-6 — Choisir et ajouter la licence open source](https://linear.app/dantes/issue/PLO-6/choisir-et-ajouter-la-licence-open-source).
+> **Licence en cours de définition** — Ce dépôt est public sur GitHub, mais **aucune licence open source n’a encore été formalisée** (pas de fichier `LICENSE` à la racine). Tant que ce n’est pas le cas, le code reste par défaut **« tous droits réservés »** (*All rights reserved*) du point de vue du droit d’auteur : toute réutilisation ou redistribution nécessite une autorisation explicite des mainteneurs.
 
 Application **macOS** (Python 3) pour convertir en lot des documents bureautiques en fichiers **Markdown** (UTF-8), en vue d’alimenter une base de connaissances ou un système RAG. **Tout est local** : aucune donnée n’est envoyée vers un service cloud.
 
@@ -231,7 +231,7 @@ Testez toujours le `.app` sur une machine « propre » avant distribution.
 
 **Statut : `License: TBD` (à définir).**
 
-- Aucun fichier `LICENSE` n’est encore présent dans ce dépôt ; la décision (MIT, Apache-2.0, GPL-3.0, autre) est suivie dans **[PLO-6](https://linear.app/dantes/issue/PLO-6/choisir-et-ajouter-la-licence-open-source)**.
+- Aucun fichier `LICENSE` n’est encore présent dans ce dépôt ; le choix (MIT, Apache-2.0, GPL-3.0, autre) est en cours de réflexion par les mainteneurs.
 - En attendant, considérez le contenu du dépôt comme **non licencié pour la réutilisation** : contactez les mainteneurs si vous souhaitez forker, redistribuer ou intégrer ce code dans un autre produit.
 
 Une fois la licence choisie, cette section sera remplacée par l’identifiant SPDX (ex. `MIT`, `Apache-2.0`) et un lien vers le fichier `LICENSE`.
