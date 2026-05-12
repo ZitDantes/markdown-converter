@@ -32,8 +32,12 @@ def write_report(summary: ConversionSummary, report_path: Path | None = None) ->
     lines.append(f"- **Fichiers convertis avec succès** : {len(success)}")
     lines.append(f"- **Fichiers en erreur** : {len(errors)}")
     lines.append(f"- **Fichiers vides (non écrits)** : {len(empty)}")
-    lines.append(f"- **Chemins ignorés (format non supporté)** : {len(summary.unsupported_skipped)}")
-    lines.append(f"- **Pandoc disponible sur la machine** : {'oui' if summary.pandoc_available else 'non'}")
+    lines.append(
+        f"- **Chemins ignorés (format non supporté)** : {len(summary.unsupported_skipped)}"
+    )
+    lines.append(
+        f"- **Pandoc disponible sur la machine** : {'oui' if summary.pandoc_available else 'non'}"
+    )
     lines.append("")
 
     lines.append("## Relecture obligatoire pour certains formats")

@@ -46,7 +46,9 @@ class ConvertisseurApp(tk.Tk):
             side=tk.LEFT, padx=4
         )
 
-        ttk.Label(self, text="Fichiers et dossiers sources :").pack(anchor=tk.W, padx=10, pady=(8, 0))
+        ttk.Label(self, text="Fichiers et dossiers sources :").pack(
+            anchor=tk.W, padx=10, pady=(8, 0)
+        )
 
         list_frame = ttk.Frame(self)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=6)
@@ -76,7 +78,9 @@ class ConvertisseurApp(tk.Tk):
         log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=6)
         log_scroll = ttk.Scrollbar(log_frame)
         log_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self._log = tk.Text(log_frame, height=10, wrap=tk.WORD, state=tk.DISABLED, yscrollcommand=log_scroll.set)
+        self._log = tk.Text(
+            log_frame, height=10, wrap=tk.WORD, state=tk.DISABLED, yscrollcommand=log_scroll.set
+        )
         self._log.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         log_scroll.config(command=self._log.yview)
 
@@ -187,7 +191,9 @@ class ConvertisseurApp(tk.Tk):
         self._progress["value"] = 100 if ok else 0
         self._lbl_progress.config(text="Terminé." if ok else "Interrompu ou en erreur.")
         if ok:
-            messagebox.showinfo("Conversion", "Conversion terminée. Consultez le journal et le rapport.")
+            messagebox.showinfo(
+                "Conversion", "Conversion terminée. Consultez le journal et le rapport."
+            )
         else:
             messagebox.showerror(
                 "Erreur",

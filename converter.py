@@ -184,7 +184,9 @@ def convert_files(
 
     total = len(supported)
     if total == 0:
-        log("Aucun fichier à convertir : ajoutez des fichiers ou un dossier contenant des formats supportés.")
+        log(
+            "Aucun fichier à convertir : ajoutez des fichiers ou un dossier contenant des formats supportés."
+        )
         summary.finished_at = datetime.now()
         return summary
 

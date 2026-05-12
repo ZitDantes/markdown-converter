@@ -156,19 +156,14 @@ def format_warning_for_extension(ext: str) -> str | None:
             "et graphiques peuvent être perdus ou simplifiés."
         )
     if ext in {".html", ".htm"}:
-        return (
-            "Le rendu dépend de la structure HTML : scripts et styles ne sont pas reproduits à l'identique."
-        )
+        return "Le rendu dépend de la structure HTML : scripts et styles ne sont pas reproduits à l'identique."
     return None
 
 
 def yaml_scalar_double_quoted(value: str) -> str:
     """Encode une chaîne pour YAML en style double guillemets (échappement minimal)."""
     escaped = (
-        value.replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
+        value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
     )
     return f'"{escaped}"'
 
