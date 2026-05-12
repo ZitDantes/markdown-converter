@@ -1,6 +1,15 @@
 # Convertisseur Markdown IA (MVP)
 
+> **Licence en cours de définition** — Ce dépôt est public sur GitHub, mais **aucune licence open source n’a encore été formalisée** (pas de fichier `LICENSE` à la racine). Tant que ce n’est pas le cas, le code reste par défaut **« tous droits réservés »** (*All rights reserved*) du point de vue du droit d’auteur : toute réutilisation ou redistribution nécessite une autorisation explicite du titulaire des droits. Suivi : [PLO-6 — Choisir et ajouter la licence open source](https://linear.app/dantes/issue/PLO-6/choisir-et-ajouter-la-licence-open-source).
+
 Application **macOS** (Python 3) pour convertir en lot des documents bureautiques en fichiers **Markdown** (UTF-8), en vue d’alimenter une base de connaissances ou un système RAG. **Tout est local** : aucune donnée n’est envoyée vers un service cloud.
+
+## Table des matières
+
+- [Pour les utilisateurs](#pour-les-utilisateurs)
+- [Qualité, limites et bonnes pratiques](#qualite-limites-et-bonnes-pratiques)
+- [Pour les développeurs et la distribution (macOS)](#pour-les-developpeurs-et-la-distribution-macos)
+- [Licence](#licence)
 
 ---
 
@@ -46,7 +55,14 @@ python3 main.py
 
 ### Installation
 
-Dans un terminal, placez-vous dans le dossier du projet, puis :
+Clonez le dépôt (ou téléchargez une archive ZIP depuis GitHub), puis ouvrez un terminal dans ce dossier :
+
+```bash
+git clone https://github.com/ZitDantes/markdown-converter.git
+cd markdown-converter
+```
+
+Ensuite :
 
 **Si vous utilisez Homebrew (recommandé sur Apple Silicon)** — Python **et** Tk pour la même version :
 
@@ -213,4 +229,9 @@ Testez toujours le `.app` sur une machine « propre » avant distribution.
 
 ## Licence
 
-Projet modèle MVP : précisez la licence selon votre usage interne ou open source.
+**Statut : `License: TBD` (à définir).**
+
+- Aucun fichier `LICENSE` n’est encore présent dans ce dépôt ; la décision (MIT, Apache-2.0, GPL-3.0, autre) est suivie dans **[PLO-6](https://linear.app/dantes/issue/PLO-6/choisir-et-ajouter-la-licence-open-source)**.
+- En attendant, considérez le contenu du dépôt comme **non licencié pour la réutilisation** : contactez les mainteneurs si vous souhaitez forker, redistribuer ou intégrer ce code dans un autre produit.
+
+Une fois la licence choisie, cette section sera remplacée par l’identifiant SPDX (ex. `MIT`, `Apache-2.0`) et un lien vers le fichier `LICENSE`.
