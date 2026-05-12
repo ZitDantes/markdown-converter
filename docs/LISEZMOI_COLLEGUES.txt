@@ -1,0 +1,29 @@
+Convertisseur Markdown IA — installation rapide (macOS)
+======================================================
+
+Contenu de l’archive
+--------------------
+- « Convertisseur Markdown IA.app » : l’application (double-clic pour lancer).
+- Ce fichier LISEZMOI (vous pouvez le supprimer après lecture).
+
+Installation
+------------
+1. Décompressez le fichier ZIP (double-clic).
+2. Glissez « Convertisseur Markdown IA.app » dans le dossier « Applications » de votre Mac (recommandé).
+
+Premier lancement (Gatekeeper)
+------------------------------
+L’application n’est en général **pas signée** par Apple. Au premier lancement, macOS peut afficher un message du type « développeur non identifié ».
+
+- Faites un **clic droit** (ou Ctrl-clic) sur l’icône de l’app, puis choisissez **Ouvrir**, puis confirmez.
+- Ou : Réglages système → Confidentialité et sécurité → autoriser l’ouverture.
+
+Aucune donnée n’est envoyée sur Internet : tout fonctionne en local.
+
+Pandoc (facultatif)
+-------------------
+Le secours « Pandoc » n’est pas inclus dans l’application. Si votre service informatique l’autorise, vous pouvez installer Pandoc séparément (https://pandoc.org) ; ce n’est pas obligatoire pour utiliser l’outil.
+
+Support
+-------
+En cas de problème, contactez la personne qui vous a transmis ce package.

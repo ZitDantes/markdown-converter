@@ -1,0 +1,50 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+ENV/
+
+# PyInstaller (artefacts de build, à reconstruire localement)
+build/
+dist/
+*.manifest
+
+# Archives de distribution générées localement
+*.zip
+*.dmg
+*.pkg
+
+# IDE / éditeurs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs et secrets
+*.log
+.env
+.env.local
+.env.*.local

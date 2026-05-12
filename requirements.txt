@@ -1,0 +1,5 @@
+# Python 3.10+ requis pour MarkItDown (versions récentes PyPI).
+markitdown[pdf,docx,pptx,xlsx]>=0.1.0
+
+# Optionnel : packaging application macOS
+# pyinstaller>=6.0
