@@ -172,7 +172,8 @@ class ConvertisseurApp(tk.Tk):
                 self._log_async(f"Rapport enregistré : {report_path}")
                 self.after(0, lambda: self._conversion_finished(True, None))
             except Exception as e:  # noqa: BLE001
-                self.after(0, lambda: self._conversion_finished(False, str(e)))
+                err = str(e)
+                self.after(0, lambda err=err: self._conversion_finished(False, err))
 
         threading.Thread(target=worker, daemon=True).start()
 
