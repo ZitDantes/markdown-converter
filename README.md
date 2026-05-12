@@ -16,7 +16,7 @@ Typique après `brew install python@3.12` **sans** le paquet Tk. Installez-le pu
 brew install python-tk@3.12
 # adaptez 3.12 si vous utilisez 3.11 ou 3.10 : python-tk@3.11, etc.
 
-cd /Users/admin/Cursor/app_convert_md
+cd markdown-converter   # racine du dépôt cloné (dossier contenant main.py)
 rm -rf .venv
 python3.12 -m venv .venv
 source .venv/bin/activate
@@ -29,7 +29,7 @@ python3 main.py
 Vous êtes très probablement en **Python 3.9** (vérifiez avec `python3 --version`). Recréez un environnement avec Python 3.10+ (ex. 3.12) :
 
 ```bash
-cd /Users/admin/Cursor/app_convert_md
+cd markdown-converter   # racine du dépôt cloné (dossier contenant main.py)
 rm -rf .venv
 python3.12 -m venv .venv   # ou python3.11, python3.10 selon ce qui est installé
 source .venv/bin/activate
@@ -53,7 +53,7 @@ brew install python@3.12 python-tk@3.12
 Puis création du venv et dépendances :
 
 ```bash
-cd /Users/admin/Cursor/app_convert_md
+cd markdown-converter   # racine du dépôt cloné (dossier contenant main.py)
 python3.12 -m venv .venv
 # ou : python3.11 -m venv .venv  /  python3.10 -m venv .venv
 source .venv/bin/activate
@@ -107,7 +107,7 @@ L’objectif est de fournir une **application autonome** (`.app`) : vos collègu
 3. Lancer le build **recommandé** via le fichier spec (inclut `collect_all` pour MarkItDown) :
 
 ```bash
-cd /Users/admin/Cursor/app_convert_md
+cd markdown-converter   # racine du dépôt cloné (dossier contenant main.py)
 source .venv/bin/activate
 python3 -m pip install pyinstaller
 python3 -m PyInstaller --noconfirm ConvertisseurMarkdownIA.spec
