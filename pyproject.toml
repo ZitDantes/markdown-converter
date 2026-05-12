@@ -1,0 +1,41 @@
+[tool.ruff]
+# Cible Python : aligné sur MIN_PYTHON dans main.py (3.10+).
+target-version = "py310"
+
+# Longueur de ligne : compromis entre lisibilité et code existant.
+line-length = 100
+
+# Fichiers/dossiers à ignorer (en complément du .gitignore).
+extend-exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "docs",
+    "scripts",
+    "*.spec",
+]
+
+[tool.ruff.lint]
+# Sélection de règles raisonnable pour un projet Python moderne :
+#   E, W : pycodestyle (style PEP 8)
+#   F    : pyflakes (erreurs latentes, imports inutilisés)
+#   I    : isort (tri des imports)
+#   B    : flake8-bugbear (pièges classiques)
+#   UP   : pyupgrade (syntaxe Python moderne)
+#   SIM  : flake8-simplify (simplifications)
+#   BLE  : flake8-blind-except (capture trop large des exceptions)
+#   RUF  : règles ruff-spécifiques
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "BLE", "RUF"]
+
+# Ignores ciblés. À justifier par un commentaire.
+ignore = [
+    # E501 : longueur de ligne déjà gérée par `ruff format` ; pas besoin de remonter
+    # l'erreur en lint quand le formateur ne peut pas couper proprement (URLs, commentaires).
+    "E501",
+]
+
+[tool.ruff.format]
+# Style proche de black, suffisant pour ce projet.
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = false
