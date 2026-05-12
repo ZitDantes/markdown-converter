@@ -29,7 +29,7 @@ def _fail_python_version() -> None:
         root.withdraw()
         messagebox.showerror("Convertisseur Markdown IA — version de Python", msg)
         root.destroy()
-    except Exception:
+    except Exception:  # noqa: BLE001
         print(msg, file=sys.stderr)
     sys.exit(1)
 

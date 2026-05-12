@@ -1,0 +1,8 @@
+# Dépendances de développement (non requises à l'exécution de l'app).
+# Installer avec :
+#   pip install -r requirements-dev.txt
+#
+# Pensez aussi à installer les dépendances de runtime via requirements.txt.
+
+# Lint et formatage (un seul outil, configuration dans pyproject.toml)
+ruff>=0.15.0,<1.0.0
