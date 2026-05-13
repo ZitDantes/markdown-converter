@@ -1,12 +1,23 @@
 """
 Point d'entrée : lance l'interface graphique de Markdown Converter.
+
+L'UI par défaut est Tkinter (``ui.py``). Pour essayer le prototype PySide6,
+définir ``MARKDOWN_CONVERTER_UI=qt`` avant le lancement, après avoir installé
+les dépendances optionnelles ::
+
+    pip install -r requirements-qt.txt
+    MARKDOWN_CONVERTER_UI=qt python3 main.py
 """
 
 from __future__ import annotations
 
+import os
 import sys
 
 MIN_PYTHON = (3, 10)
+UI_ENV_VAR = "MARKDOWN_CONVERTER_UI"
+UI_TK = "tk"
+UI_QT = "qt"
 
 
 def _fail_python_version() -> None:
@@ -58,9 +69,50 @@ def _fail_tkinter(exc: BaseException | None = None) -> None:
     sys.exit(1)
 
 
+def _resolve_ui_choice() -> str:
+    """Lit ``MARKDOWN_CONVERTER_UI`` ; valeurs ignorées (typo, vide) → ``tk``."""
+    raw = os.environ.get(UI_ENV_VAR, "").strip().lower()
+    return UI_QT if raw == UI_QT else UI_TK
+
+
+def _run_qt_ui() -> bool:
+    """Tente de lancer l'UI PySide6 ; retourne ``True`` si elle a tourné.
+
+    Si PySide6 n'est pas installé, on prévient et on retourne ``False`` pour
+    que ``main()`` retombe sur l'UI Tkinter (au lieu de planter l'app).
+    """
+    try:
+        from ui_qt import run_app as run_qt_app
+    except ImportError as e:
+        print(
+            f"{UI_ENV_VAR}=qt demandé mais PySide6 est introuvable.\n"
+            "Installez-le avec : pip install -r requirements-qt.txt\n"
+            f"Bascule vers l'interface Tkinter par sécurité.\nDétail : {e}",
+            file=sys.stderr,
+        )
+        return False
+    run_qt_app()
+    return True
+
+
 def main() -> None:
     if sys.version_info < MIN_PYTHON:
         _fail_python_version()
+
+    ui_choice = _resolve_ui_choice()
+
+    if ui_choice == UI_QT:
+        from logging_setup import get_logger, setup_logging
+
+        log_path = setup_logging()
+        get_logger("main").info(
+            "Démarrage de l'application (UI Qt, logs : %s).",
+            log_path,
+        )
+        if _run_qt_ui():
+            return
+        # Sinon : on tombe sur le chemin Tk ci-dessous.
+
     try:
         import tkinter  # noqa: F401
     except ImportError as e:
@@ -69,7 +121,7 @@ def main() -> None:
     from logging_setup import get_logger, setup_logging
 
     log_path = setup_logging()
-    get_logger("main").info("Démarrage de l'application (logs : %s).", log_path)
+    get_logger("main").info("Démarrage de l'application (UI Tk, logs : %s).", log_path)
 
     from ui import run_app
 
