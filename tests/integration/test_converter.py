@@ -1,14 +1,17 @@
 """
 Tests d'intégration de ``converter.convert_files``.
 
-Hors scope (PLO-12) : mocks de MarkItDown / Pandoc, formats binaires (.docx, .pdf,
-.pptx, .xlsx). Ces cas seront ajoutés dans des tickets dédiés.
+Hors scope : conversion réelle de formats binaires (.docx, .pdf, .pptx, .xlsx).
+Pour les transitions de statut côté secours, on monkeypatche les engines de
+``converter`` afin de ne pas dépendre de la présence de Pandoc en CI.
 """
 
 from __future__ import annotations
 
 import shutil
 from pathlib import Path
+
+import pytest
 
 from converter import ConversionStatus, convert_files
 
@@ -44,7 +47,7 @@ def test_converts_simple_txt_to_markdown(tmp_path: Path, fixtures_dir: Path) -> 
 
 
 def test_converts_simple_html_to_markdown(tmp_path: Path, fixtures_dir: Path) -> None:
-    """Cas nominal HTML : la conversion produit un .md non vide contenant le contenu cible."""
+    """Cas HTML : conversion OK, statut SUCCESS_REVIEW car le format a un avertissement."""
     src = tmp_path / "simple.html"
     shutil.copy(fixtures_dir / "simple.html", src)
     output_dir = tmp_path / "out"
@@ -57,7 +60,8 @@ def test_converts_simple_html_to_markdown(tmp_path: Path, fixtures_dir: Path) ->
 
     assert len(summary.records) == 1
     record = summary.records[0]
-    assert record.status is ConversionStatus.SUCCESS
+    # HTML déclenche format_warning_for_extension → SUCCESS_REVIEW (pas SUCCESS pur).
+    assert record.status is ConversionStatus.SUCCESS_REVIEW
     assert record.output_path is not None
     assert record.output_path.exists()
 
@@ -94,3 +98,69 @@ def test_unsupported_extension_yields_unsupported_record(tmp_path: Path) -> None
 
     # L'utilisateur a bien reçu un avertissement.
     assert any(level == "WARNING" for level, _ in callbacks)
+
+
+def test_success_fallback_when_primary_fails_and_pandoc_recovers(
+    tmp_path: Path,
+    fixtures_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Si le moteur primaire lève ``EngineConversionError`` et que le secours
+    réussit, le statut doit être ``SUCCESS_FALLBACK`` (et non ``SUCCESS``).
+
+    On utilise un fichier ``.txt`` (pas d'avertissement de format) pour
+    distinguer ``SUCCESS_FALLBACK`` de ``SUCCESS_REVIEW``.
+    """
+    import converter
+    from engines import EngineConversionError
+
+    class _BrokenPrimary:
+        name = "FakeMarkItDown"
+
+        @classmethod
+        def is_available(cls) -> bool:
+            return True
+
+        def supports(self, path: Path) -> bool:
+            return True
+
+        def convert(self, src: Path) -> str:
+            raise EngineConversionError("simulated primary failure")
+
+    class _GoodFallback:
+        name = "FakePandoc"
+
+        @classmethod
+        def is_available(cls) -> bool:
+            return True
+
+        @classmethod
+        def executable_path(cls) -> str:
+            return "/fake/pandoc"
+
+        def supports(self, path: Path) -> bool:
+            return True
+
+        def convert(self, src: Path) -> str:
+            return "# Contenu récupéré\n\nLe secours a fonctionné."
+
+    monkeypatch.setattr(converter, "MarkItDownEngine", _BrokenPrimary)
+    monkeypatch.setattr(converter, "PandocEngine", _GoodFallback)
+
+    src = tmp_path / "simple.txt"
+    shutil.copy(fixtures_dir / "simple.txt", src)
+    output_dir = tmp_path / "out"
+
+    summary = convert_files(
+        explicit_files=[src],
+        directory_roots=[],
+        output_dir=output_dir,
+    )
+
+    assert len(summary.records) == 1
+    record = summary.records[0]
+    assert record.status is ConversionStatus.SUCCESS_FALLBACK
+    assert record.used_pandoc_fallback is True
+    assert record.engine_used == "FakePandoc"
+    assert record.output_path is not None and record.output_path.exists()
