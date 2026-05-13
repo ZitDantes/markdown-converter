@@ -153,18 +153,32 @@ Objectif : produire une **application autonome** (`.app`) pour des utilisateurs 
 
 ### Structure du projet
 
-| Fichier | Rôle |
-|---------|------|
+| Fichier ou dossier | Rôle |
+|--------------------|------|
 | `main.py` | Lancement de l’application. |
 | `ui.py` | Interface Tkinter (français). |
-| `converter.py` | Conversion (MarkItDown, secours Pandoc). |
+| `converter.py` | Orchestration du lot (boucle, statut par fichier, rapport). |
+| `engines/` | Moteurs de conversion isolés derrière une interface commune. |
+| `engines/base.py` | Classe abstraite `ConverterEngine` et exceptions custom. |
+| `engines/markitdown_engine.py` | Moteur principal **MarkItDown** (import paresseux). |
+| `engines/pandoc_engine.py` | Moteur de secours **Pandoc** (binaire externe). |
 | `report.py` | Génération de `rapport_conversion.md`. |
-| `utils.py` | Extensions, chemins, nettoyage, détection Pandoc. |
+| `utils.py` | Extensions, chemins, nettoyage Markdown, avertissements par format. |
 | `ConvertisseurMarkdownIA.spec` | Définition PyInstaller (build `.app` reproductible). |
 | `scripts/build_mac_app.sh` | Script : PyInstaller + ZIP daté + LISEZMOI pour collègues. |
 | `docs/LISEZMOI_COLLEGUES.txt` | Texte d’accompagnement pour l’archive distribuée. |
 
 L’API de `converter.py` (callbacks `on_log` / `on_progress`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier.
+
+#### Ajouter un moteur de conversion
+
+Pour ajouter un nouveau moteur (OCR, conversion cloud, format exotique…), il suffit de :
+
+1. Créer un fichier `engines/<nom>_engine.py` avec une classe qui hérite de [`ConverterEngine`](engines/base.py) et implémente `is_available()`, `supports(path)` et `convert(path) -> str`.
+2. Exposer la nouvelle classe dans `engines/__init__.py`.
+3. La brancher dans l’orchestration de [`convert_files()`](converter.py) (ordre de priorité, secours, etc.).
+
+L’interface garantit que l’orchestrateur n’a pas besoin de connaître les détails du moteur.
 
 ### Lint et formatage (ruff)
 
