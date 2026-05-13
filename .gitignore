@@ -48,3 +48,8 @@ dist/
 .env
 .env.local
 .env.*.local
+
+# Documents de test locaux (chaque dev y pose ses propres fichiers)
+samples/*
+!samples/README.md
+!samples/.gitkeep
