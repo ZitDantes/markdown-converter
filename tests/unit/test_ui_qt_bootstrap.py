@@ -85,13 +85,16 @@ def test_journal_is_hidden_by_default(qt_app: object) -> None:
 def test_file_view_parts_exposed_after_build(qt_app: object) -> None:
     from ui_qt import FileViewParts, MarkdownConverterQtApp
     from ui_qt_file_model import ConversionFileTableModel
+    from ui_qt_file_proxy import ConversionFileFilterProxy
 
     app = MarkdownConverterQtApp()
     app.build()
     parts = app.file_view_parts
     assert isinstance(parts, FileViewParts)
     assert isinstance(parts.model, ConversionFileTableModel)
-    assert parts.table.model() is parts.model
+    assert isinstance(parts.proxy, ConversionFileFilterProxy)
+    assert parts.table.model() is parts.proxy
+    assert parts.proxy.sourceModel() is parts.model
     assert parts.add_file_button.objectName() == "file_view_add_file"
     assert parts.add_folder_button.objectName() == "file_view_add_folder"
 
@@ -145,3 +148,55 @@ def test_set_output_dir_updates_banner(qt_app: object, tmp_path: object) -> None
     app.set_output_dir(target)
     assert app.output_banner_parts is not None
     assert str(target.resolve()) in app.output_banner_parts.label.text()
+
+
+def test_toolbar_chip_filters_proxy(qt_app: object, tmp_path: object) -> None:
+    from ui_qt import MarkdownConverterQtApp, add_paths_to_model
+
+    app = MarkdownConverterQtApp()
+    app.build()
+    assert app.toolbar_parts is not None
+    assert app.file_view_parts is not None
+
+    docx = tmp_path / "doc.docx"
+    pdf = tmp_path / "rep.pdf"
+    txt = tmp_path / "notes.txt"
+    for p in (docx, pdf, txt):
+        p.write_bytes(b"x")
+    add_paths_to_model(app.file_view_parts.model, [docx, pdf, txt])
+
+    assert app.file_view_parts.proxy.rowCount() == 3
+    assert app.toolbar_parts.chip_buttons[".docx"].text().endswith(" 1")
+    assert app.toolbar_parts.chip_buttons[".pdf"].text().endswith(" 1")
+    assert app.toolbar_parts.chip_buttons[".pptx"].text().endswith(" 0")
+
+    app.toolbar_parts.chip_buttons[".pdf"].setChecked(True)
+    assert app.file_view_parts.proxy.rowCount() == 1
+    assert app.file_view_parts.proxy.active_extensions() == {".pdf"}
+
+    app.toolbar_parts.chip_buttons[".pdf"].setChecked(False)
+    assert app.file_view_parts.proxy.rowCount() == 3
+
+
+def test_toolbar_search_filters_proxy(qt_app: object, tmp_path: object) -> None:
+    from ui_qt import MarkdownConverterQtApp, add_paths_to_model
+
+    app = MarkdownConverterQtApp()
+    app.build()
+    assert app.toolbar_parts is not None
+    assert app.file_view_parts is not None
+
+    a = tmp_path / "rapport.docx"
+    b = tmp_path / "annexe.docx"
+    for p in (a, b):
+        p.write_bytes(b"x")
+    add_paths_to_model(app.file_view_parts.model, [a, b])
+
+    app.toolbar_parts.search_input.setText("RAP")
+    assert app.file_view_parts.proxy.rowCount() == 1
+    rec = app.file_view_parts.proxy.source_record_at(0)
+    assert rec is not None
+    assert rec.source_path.name == "rapport.docx"
+
+    app.toolbar_parts.search_input.setText("")
+    assert app.file_view_parts.proxy.rowCount() == 2

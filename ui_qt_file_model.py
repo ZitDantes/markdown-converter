@@ -39,9 +39,18 @@ _COL_PROGRESS = 4
 _HEADERS = ("Format", "Fichier", "Taille", "Statut", "Progression")
 
 
+def format_accent_hex(ext: str) -> str:
+    """Retourne le code couleur hexadécimal pour une extension (ex. ``.docx``).
+
+    Public car réutilisé par la toolbar (chips de filtre, PLO-36) afin de
+    garder un mapping unique avec la colonne « Format » du modèle.
+    """
+    normalized = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+    return _FORMAT_ACCENT_HEX.get(normalized, _DEFAULT_FORMAT_HEX)
+
+
 def _format_accent_hex_for_path(path: Path) -> str:
-    ext = normalize_extension(path)
-    return _FORMAT_ACCENT_HEX.get(ext, _DEFAULT_FORMAT_HEX)
+    return format_accent_hex(normalize_extension(path))
 
 
 def _format_monogram(path: Path) -> str:
