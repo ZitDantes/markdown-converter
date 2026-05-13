@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from converter import ConversionStatus, ConversionSummary
+from converter import SUCCESS_STATUSES, ConversionStatus, ConversionSummary
 
 
 def write_report(summary: ConversionSummary, report_path: Path | None = None) -> Path:
@@ -23,13 +23,19 @@ def write_report(summary: ConversionSummary, report_path: Path | None = None) ->
     lines.append("")
     lines.append("## Résumé")
     lines.append("")
-    success = [r for r in summary.records if r.status == ConversionStatus.SUCCESS]
+    success_all = [r for r in summary.records if r.status in SUCCESS_STATUSES]
+    success_clean = [r for r in summary.records if r.status == ConversionStatus.SUCCESS]
+    success_review = [r for r in summary.records if r.status == ConversionStatus.SUCCESS_REVIEW]
+    success_fallback = [r for r in summary.records if r.status == ConversionStatus.SUCCESS_FALLBACK]
     errors = [r for r in summary.records if r.status == ConversionStatus.ERROR]
     empty = [r for r in summary.records if r.status == ConversionStatus.EMPTY]
     lines.append(f"- **Début du lot** : {summary.started_at.strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append(f"- **Fin du lot** : {summary.finished_at.strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append(f"- **Dossier de sortie** : `{summary.output_dir}`")
-    lines.append(f"- **Fichiers convertis avec succès** : {len(success)}")
+    lines.append(f"- **Fichiers convertis avec succès** : {len(success_all)}")
+    lines.append(f"    - sans avertissement : {len(success_clean)}")
+    lines.append(f"    - à relire (avertissement de format) : {len(success_review)}")
+    lines.append(f"    - via secours Pandoc : {len(success_fallback)}")
     lines.append(f"- **Fichiers en erreur** : {len(errors)}")
     lines.append(f"- **Fichiers vides (non écrits)** : {len(empty)}")
     lines.append(
@@ -52,13 +58,18 @@ def write_report(summary: ConversionSummary, report_path: Path | None = None) ->
 
     lines.append("## Fichiers convertis avec succès")
     lines.append("")
-    if not success:
+    if not success_all:
         lines.append("_Aucun._")
     else:
-        for r in success:
+        for r in success_all:
             out_name = r.output_path.name if r.output_path else "?"
-            pandoc_note = " (secours Pandoc)" if r.used_pandoc_fallback else ""
-            lines.append(f"- `{r.source_path}` → `{out_name}`{pandoc_note}")
+            tags: list[str] = []
+            if r.status == ConversionStatus.SUCCESS_REVIEW:
+                tags.append("à relire")
+            if r.used_pandoc_fallback:
+                tags.append("secours Pandoc")
+            suffix = f" ({', '.join(tags)})" if tags else ""
+            lines.append(f"- `{r.source_path}` → `{out_name}`{suffix}")
             if r.message:
                 lines.append(f"  - Note : {r.message}")
     lines.append("")
