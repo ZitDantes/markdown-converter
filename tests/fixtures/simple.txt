@@ -1,0 +1,7 @@
+Titre du document de test
+
+Premier paragraphe : le contenu est volontairement minimal pour valider
+le flux de conversion bout-en-bout, sans dépendre d'un format complexe.
+
+Second paragraphe : on s'assure simplement qu'un fichier Markdown non vide
+est produit en sortie.

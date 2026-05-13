@@ -6,3 +6,6 @@
 
 # Lint et formatage (un seul outil, configuration dans pyproject.toml)
 ruff>=0.15.0,<1.0.0
+
+# Tests automatisés (runner + plugin couverture future, cf. PLO-12).
+pytest>=8.0,<9.0
