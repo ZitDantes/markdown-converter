@@ -16,6 +16,36 @@ import pytest
 from converter import ConversionStatus, convert_files
 
 
+def test_on_progress_percent_monotonic_and_records_finished(
+    tmp_path: Path,
+    fixtures_dir: Path,
+) -> None:
+    """Le 4e argument ``percent`` est non décroissant ; aucun record ne reste en PROCESSING."""
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    shutil.copy(fixtures_dir / "simple.txt", a)
+    shutil.copy(fixtures_dir / "simple.txt", b)
+    output_dir = tmp_path / "out"
+
+    percents: list[float] = []
+
+    def on_progress(_i: int, _t: int, _lab: str, pct: float) -> None:
+        percents.append(pct)
+
+    summary = convert_files(
+        explicit_files=[a, b],
+        directory_roots=[],
+        output_dir=output_dir,
+        on_progress=on_progress,
+    )
+
+    assert percents, "au moins une notification de progression attendue"
+    assert percents == sorted(percents)
+    assert percents[-1] == pytest.approx(1.0)
+    assert all(r.status is not ConversionStatus.PROCESSING for r in summary.records)
+    assert all(r.progress_percent == pytest.approx(1.0) for r in summary.records)
+
+
 def test_converts_simple_txt_to_markdown(tmp_path: Path, fixtures_dir: Path) -> None:
     """Cas nominal : un .txt minimal produit un .md non vide avec statut SUCCESS."""
     src = tmp_path / "simple.txt"

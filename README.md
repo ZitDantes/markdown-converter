@@ -223,7 +223,7 @@ Pour **contribuer au code** (correctifs, évolutions, documentation technique), 
 | `samples/` | Dossier local pour les documents de test (ignoré par git, voir [`samples/README.md`](samples/README.md)). |
 | `tests/` | Suite pytest (`unit/`, `integration/`, `fixtures/`, `conftest.py`). |
 
-L’API de `converter.py` (callbacks `on_log(level, message)` / `on_progress`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier. Le callback `on_log` est branché en interne sur le logger nommé `markdown_converter` ; tout passe donc aussi par le fichier de log persistant (voir [Logs et diagnostic](#logs-et-diagnostic)).
+L'API de `converter.py` (callbacks `on_log(level, message)` / `on_progress(index, total, label[, percent])`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier. Le quatrième argument `percent` (0.0-1.0, part globale du lot) est optionnel : les callbacks à trois arguments restent valides. Le callback `on_log` est branché en interne sur le logger nommé `markdown_converter` ; tout passe donc aussi par le fichier de log persistant (voir [Logs et diagnostic](#logs-et-diagnostic)).
 
 #### Ajouter un moteur de conversion
 
