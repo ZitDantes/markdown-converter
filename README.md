@@ -1,8 +1,9 @@
 # Markdown Converter (MVP)
 
 [![CI](https://github.com/ZitDantes/markdown-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/ZitDantes/markdown-converter/actions/workflows/ci.yml)
+[![Licence : MIT](https://img.shields.io/badge/Licence-MIT-blue.svg)](LICENSE)
 
-> **Licence en cours de définition** — Ce dépôt est public sur GitHub, mais **aucune licence open source n’a encore été formalisée** (pas de fichier `LICENSE` à la racine). Tant que ce n’est pas le cas, le code reste par défaut **« tous droits réservés »** (*All rights reserved*) du point de vue du droit d’auteur : toute réutilisation ou redistribution nécessite une autorisation explicite des mainteneurs.
+Le code source est distribué sous **licence MIT** (voir le fichier [`LICENSE`](LICENSE) à la racine). Vous pouvez réutiliser et modifier le logiciel librement, sous réserve de conserver l’avis de copyright et la licence.
 
 Application **macOS** (Python 3) pour convertir en lot des documents bureautiques en fichiers **Markdown** (UTF-8), en vue d’alimenter une base de connaissances ou un système RAG. **Tout est local** : aucune donnée n’est envoyée vers un service cloud.
 
@@ -355,9 +356,10 @@ Testez toujours le `.app` sur une machine « propre » avant distribution.
 
 ## Licence
 
-**Statut : `License: TBD` (à définir).**
+**SPDX : `MIT`**
 
-- Aucun fichier `LICENSE` n’est encore présent dans ce dépôt ; le choix (MIT, Apache-2.0, GPL-3.0, autre) est en cours de réflexion par les mainteneurs.
-- En attendant, considérez le contenu du dépôt comme **non licencié pour la réutilisation** : contactez les mainteneurs si vous souhaitez forker, redistribuer ou intégrer ce code dans un autre produit.
+Le projet **Markdown Converter** est publié sous la [licence MIT](https://opensource.org/licenses/MIT). Le texte juridique complet se trouve dans le fichier [`LICENSE`](LICENSE) à la racine du dépôt.
 
-Une fois la licence choisie, cette section sera remplacée par l’identifiant SPDX (ex. `MIT`, `Apache-2.0`) et un lien vers le fichier `LICENSE`.
+**Pourquoi le MIT ?** C’est une licence permissive et largement adoptée dans l’écosystème Python ; elle autorise usage commercial et intégration dans des produits propriétaires, tout en limitant la responsabilité légale des auteurs (« tel quel », sans garantie). Elle ne requiert pas d’en-tête de licence dans chaque fichier source (contrairement au copyleft type GPL).
+
+Les **binaires** distribués via [GitHub Releases](https://github.com/ZitDantes/markdown-converter/releases) empaquetent des dépendances tierces (ex. [MarkItDown](https://github.com/microsoft/markitdown)) soumises à **leurs propres licences** ; en cas de redistribution du bundle, vérifiez la conformité avec ces licences.

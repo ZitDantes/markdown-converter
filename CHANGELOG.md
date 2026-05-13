@@ -2,6 +2,12 @@
 
 Le format est inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et ce projet adhère au [versionnement sémantique](https://semver.org/lang/fr/) (`MAJOR.MINOR.PATCH`).
 
+## [Unreleased]
+
+### Ajouté
+
+- Fichier [`LICENSE`](LICENSE) à la racine : **licence MIT** (copyright 2026 ZitDantes) ; README et CONTRIBUTING alignés.
+
 ## [0.1.0] — 2026-05-13
 
 Première version publique. Conclut l’EPIC « Stabiliser le MVP ».
