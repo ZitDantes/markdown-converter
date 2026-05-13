@@ -104,6 +104,21 @@ def _convert_and_clean(engine: ConverterEngine, src: Path) -> str:
     return clean_markdown_body(engine.convert(src))
 
 
+def _try_fallback_convert(engine: ConverterEngine, src: Path, log: LogFn) -> str | None:
+    """
+    Tente une conversion via ``engine`` (utilisé en secours).
+
+    Renvoie le Markdown nettoyé, ou ``None`` si le moteur a levé une
+    ``EngineConversionError`` (l'erreur est alors loggée). Les autres exceptions
+    sont laissées remonter à l'orchestrateur.
+    """
+    try:
+        return _convert_and_clean(engine, src)
+    except EngineConversionError as e:
+        log(f"{engine.name} (secours) n'a pas pu convertir « {src.name} » : {e}")
+        return None
+
+
 def convert_files(
     explicit_files: list[Path],
     directory_roots: list[Path],
@@ -189,12 +204,11 @@ def convert_files(
             engine_used: str | None = primary.name
 
             if is_effectively_empty_markdown(body) and fallback is not None:
-                try:
-                    body = _convert_and_clean(fallback, src)
+                fallback_body = _try_fallback_convert(fallback, src, log)
+                if fallback_body is not None:
+                    body = fallback_body
                     used_fallback = True
                     engine_used = fallback.name
-                except EngineConversionError as pe:
-                    log(f"{fallback.name} (secours) n'a pas pu convertir « {src.name} » : {pe}")
 
             if is_effectively_empty_markdown(body):
                 msg = (
@@ -242,35 +256,32 @@ def convert_files(
             log(f"Erreur pour « {src.name} » : {human}")
 
             if fallback is not None:
-                try:
-                    body = _convert_and_clean(fallback, src)
-                    if not is_effectively_empty_markdown(body):
-                        titre = _infer_title_from_body(src.stem, body)
-                        header = _build_front_matter(
-                            titre=titre,
-                            fichier_source=str(src),
-                            date_conversion=date_str,
-                            avertissement=fmt_warning,
+                fallback_body = _try_fallback_convert(fallback, src, log)
+                if fallback_body is not None and not is_effectively_empty_markdown(fallback_body):
+                    titre = _infer_title_from_body(src.stem, fallback_body)
+                    header = _build_front_matter(
+                        titre=titre,
+                        fichier_source=str(src),
+                        date_conversion=date_str,
+                        avertissement=fmt_warning,
+                    )
+                    out_path = unique_output_md_path(output_dir, src.stem)
+                    out_path.write_text(header + fallback_body + "\n", encoding="utf-8")
+                    summary.records.append(
+                        FileConversionRecord(
+                            source_path=src,
+                            status=ConversionStatus.SUCCESS,
+                            output_path=out_path,
+                            used_pandoc_fallback=True,
+                            engine_used=fallback.name,
+                            message=(
+                                f"Conversion réussie via {fallback.name} "
+                                f"après échec de {primary.name}."
+                            ),
                         )
-                        out_path = unique_output_md_path(output_dir, src.stem)
-                        out_path.write_text(header + body + "\n", encoding="utf-8")
-                        summary.records.append(
-                            FileConversionRecord(
-                                source_path=src,
-                                status=ConversionStatus.SUCCESS,
-                                output_path=out_path,
-                                used_pandoc_fallback=True,
-                                engine_used=fallback.name,
-                                message=(
-                                    f"Conversion réussie via {fallback.name} "
-                                    f"après échec de {primary.name}."
-                                ),
-                            )
-                        )
-                        log(f"Récupéré par {fallback.name} — « {src.name} » → « {out_path.name} ».")
-                        continue
-                except EngineConversionError as pe:
-                    log(f"{fallback.name} (secours) a également échoué pour « {src.name} » : {pe}")
+                    )
+                    log(f"Récupéré par {fallback.name} — « {src.name} » → « {out_path.name} ».")
+                    continue
 
             summary.records.append(
                 FileConversionRecord(
