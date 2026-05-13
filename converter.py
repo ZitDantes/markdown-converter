@@ -1,5 +1,10 @@
 """
-Logique de conversion : MarkItDown en priorité, Pandoc en secours si disponible.
+Logique de conversion : orchestre les moteurs (MarkItDown en priorité,
+Pandoc en secours si disponible).
+
+Toute l'intégration spécifique aux moteurs est isolée dans le package
+``engines`` ; ce module se concentre sur l'orchestration du lot, le statut
+par fichier et la construction du front-matter Markdown.
 """
 
 from __future__ import annotations
@@ -10,39 +15,23 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
+from engines import (
+    ConverterEngine,
+    EngineConversionError,
+    MarkItDownEngine,
+    PandocEngine,
+)
 from utils import (
     SUPPORTED_EXTENSIONS,
     clean_markdown_body,
-    find_pandoc,
     format_warning_for_extension,
     is_effectively_empty_markdown,
     merge_file_lists,
     normalize_extension,
-    pandoc_from_format_for_extension,
-    run_pandoc_to_markdown,
     unique_output_md_path,
     yaml_scalar_double_quoted,
 )
-
-
-def _load_markitdown_class() -> Any:
-    """
-    Import paresseux de MarkItDown (évite l'échec au chargement du module si le paquet est absent).
-
-    Les versions récentes (PyPI, Python 3.10+) exposent ``MarkItDown`` ; l'alpha 0.0.1a1 sous Python 3.9 non.
-    """
-    try:
-        from markitdown import MarkItDown as MarkItDownCls
-    except ImportError as e:
-        raise RuntimeError(
-            "Impossible d'importer MarkItDown. Utilisez **Python 3.10 ou plus**, puis dans le dossier du projet :\n"
-            "  pip install --upgrade pip\n"
-            "  pip install --force-reinstall -r requirements.txt\n\n"
-            f"Détail : {e}"
-        ) from e
-    return MarkItDownCls
 
 
 class ConversionStatus(str, Enum):
@@ -61,6 +50,9 @@ class FileConversionRecord:
     output_path: Path | None = None
     message: str | None = None
     used_pandoc_fallback: bool = False
+    # Nom du moteur ayant produit le Markdown (None si aucun n'a réussi).
+    # Plus évolutif que ``used_pandoc_fallback`` pour de futurs moteurs (OCR, etc.).
+    engine_used: str | None = None
 
 
 @dataclass
@@ -78,15 +70,6 @@ class ConversionSummary:
 
 LogFn = Callable[[str], None]
 ProgressFn = Callable[[int, int, str], None]
-
-
-def _markdown_from_markitdown_result(result: object) -> str:
-    """Extrait le texte Markdown depuis l'objet résultat MarkItDown (compatibilité versions)."""
-    for attr in ("text_content", "markdown", "md"):
-        val = getattr(result, attr, None)
-        if isinstance(val, str) and val.strip():
-            return val
-    return ""
 
 
 def _infer_title_from_body(stem: str, body: str) -> str:
@@ -116,21 +99,9 @@ def _build_front_matter(
     return "\n".join(lines) + "\n\n"
 
 
-def _convert_with_markitdown(md_engine: Any, path: Path) -> str:
-    # ``convert_local`` est préféré (chemins locaux uniquement) ; repli pour anciennes versions.
-    if hasattr(md_engine, "convert_local"):
-        result = md_engine.convert_local(str(path))
-    else:
-        result = md_engine.convert(str(path))
-    return _markdown_from_markitdown_result(result)
-
-
-def _try_pandoc(path: Path, pandoc_exe: str) -> str:
-    ext = normalize_extension(path)
-    reader = pandoc_from_format_for_extension(ext)
-    if not reader:
-        raise RuntimeError("Pandoc ne propose pas de lecteur adapté pour ce format.")
-    return run_pandoc_to_markdown(pandoc_exe, path, reader)
+def _convert_and_clean(engine: ConverterEngine, src: Path) -> str:
+    """Convertit ``src`` avec ``engine`` puis nettoie le Markdown produit."""
+    return clean_markdown_body(engine.convert(src))
 
 
 def convert_files(
@@ -152,19 +123,19 @@ def convert_files(
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    pandoc_exe = find_pandoc()
-    pandoc_ok = bool(pandoc_exe)
+    pandoc_ok = PandocEngine.is_available()
     if not pandoc_ok:
         log(
             "Note : Pandoc n'est pas installé ou absent du PATH. "
-            "La conversion utilise **uniquement MarkItDown**, ce qui est le fonctionnement normal du programme. "
-            "Pandoc est **optionnel** : il sert de secours si un fichier pose problème avec MarkItDown. "
-            "Pour l'ajouter : « brew install pandoc » (macOS) ou voir https://pandoc.org/installing.html ."
+            "La conversion utilise **uniquement MarkItDown**, ce qui est le fonctionnement "
+            "normal du programme. Pandoc est **optionnel** : il sert de secours si un fichier "
+            "pose problème avec MarkItDown. Pour l'ajouter : « brew install pandoc » (macOS) "
+            "ou voir https://pandoc.org/installing.html ."
         )
     else:
         log(
-            f"Pandoc est disponible ({pandoc_exe}) ; il ne sera utilisé qu'en secours si MarkItDown échoue "
-            "ou renvoie un contenu vide."
+            f"Pandoc est disponible ({PandocEngine.executable_path()}) ; "
+            "il ne sera utilisé qu'en secours si MarkItDown échoue ou renvoie un contenu vide."
         )
 
     supported, unsupported = merge_file_lists(explicit_files, directory_roots)
@@ -185,13 +156,15 @@ def convert_files(
     total = len(supported)
     if total == 0:
         log(
-            "Aucun fichier à convertir : ajoutez des fichiers ou un dossier contenant des formats supportés."
+            "Aucun fichier à convertir : ajoutez des fichiers ou un dossier "
+            "contenant des formats supportés."
         )
         summary.finished_at = datetime.now()
         return summary
 
-    MarkItDown = _load_markitdown_class()
-    md_engine = MarkItDown(enable_plugins=False)
+    # Instanciation des moteurs (le primaire peut lever EngineNotAvailableError → propagé).
+    primary: ConverterEngine = MarkItDownEngine()
+    fallback: ConverterEngine | None = PandocEngine() if pandoc_ok else None
 
     for idx, src in enumerate(supported, start=1):
         label = src.name
@@ -211,16 +184,17 @@ def convert_files(
         date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
-            body = _convert_with_markitdown(md_engine, src)
-            body = clean_markdown_body(body)
-            used_pandoc = False
+            body = _convert_and_clean(primary, src)
+            used_fallback = False
+            engine_used: str | None = primary.name
 
-            if is_effectively_empty_markdown(body) and pandoc_ok:
+            if is_effectively_empty_markdown(body) and fallback is not None:
                 try:
-                    body = clean_markdown_body(_try_pandoc(src, pandoc_exe))  # type: ignore[arg-type]
-                    used_pandoc = True
-                except Exception as pe:  # noqa: BLE001
-                    log(f"Pandoc (secours) n'a pas pu convertir « {src.name} » : {pe}")
+                    body = _convert_and_clean(fallback, src)
+                    used_fallback = True
+                    engine_used = fallback.name
+                except EngineConversionError as pe:
+                    log(f"{fallback.name} (secours) n'a pas pu convertir « {src.name} » : {pe}")
 
             if is_effectively_empty_markdown(body):
                 msg = (
@@ -255,10 +229,11 @@ def convert_files(
                     source_path=src,
                     status=ConversionStatus.SUCCESS,
                     output_path=out_path,
-                    used_pandoc_fallback=used_pandoc,
+                    used_pandoc_fallback=used_fallback,
+                    engine_used=engine_used,
                 )
             )
-            how = "Pandoc (secours)" if used_pandoc else "MarkItDown"
+            how = f"{engine_used} (secours)" if used_fallback else engine_used
             log(f"OK — « {src.name} » → « {out_path.name} » ({how}).")
 
         except Exception as e:  # noqa: BLE001
@@ -266,9 +241,9 @@ def convert_files(
             human = f"{type(e).__name__} : {e}"
             log(f"Erreur pour « {src.name} » : {human}")
 
-            if pandoc_ok:
+            if fallback is not None:
                 try:
-                    body = clean_markdown_body(_try_pandoc(src, pandoc_exe))  # type: ignore[arg-type]
+                    body = _convert_and_clean(fallback, src)
                     if not is_effectively_empty_markdown(body):
                         titre = _infer_title_from_body(src.stem, body)
                         header = _build_front_matter(
@@ -285,13 +260,17 @@ def convert_files(
                                 status=ConversionStatus.SUCCESS,
                                 output_path=out_path,
                                 used_pandoc_fallback=True,
-                                message="Conversion réussie via Pandoc après échec de MarkItDown.",
+                                engine_used=fallback.name,
+                                message=(
+                                    f"Conversion réussie via {fallback.name} "
+                                    f"après échec de {primary.name}."
+                                ),
                             )
                         )
-                        log(f"Récupéré par Pandoc — « {src.name} » → « {out_path.name} ».")
+                        log(f"Récupéré par {fallback.name} — « {src.name} » → « {out_path.name} ».")
                         continue
-                except Exception as pe:  # noqa: BLE001
-                    log(f"Pandoc (secours) a également échoué pour « {src.name} » : {pe}")
+                except EngineConversionError as pe:
+                    log(f"{fallback.name} (secours) a également échoué pour « {src.name} » : {pe}")
 
             summary.records.append(
                 FileConversionRecord(
