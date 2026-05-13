@@ -81,6 +81,10 @@ class ConversionStatus(str, Enum):
     # Ne doit pas figurer dans un résumé final (toujours remplacé par un statut
     # terminal avant de passer au fichier suivant).
     PROCESSING = "processing"
+    # Pré-conversion : un fichier est dans la file UI mais ``convert_files`` n'a
+    # pas encore démarré. Jamais produit par le moteur (purement additif pour
+    # l'UI Qt, cf. PLO-35).
+    QUEUED = "queued"
 
 
 SUCCESS_STATUSES: frozenset[ConversionStatus] = frozenset(

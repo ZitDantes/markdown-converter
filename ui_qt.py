@@ -1,11 +1,12 @@
 """
-Interface PySide6 du Markdown Converter (prototype, bootstrap).
+Interface PySide6 du Markdown Converter (prototype).
 
 Ce module est **désactivé par défaut** : il n'est utilisé que si la variable
-d'environnement ``MARKDOWN_CONVERTER_UI`` vaut ``qt``. À ce stade (PLO-34),
-on pose uniquement le squelette : fenêtre principale, zones nommées, aucune
-logique fonctionnelle. Les widgets seront garnis dans les sous-tickets
-suivants (file de conversion, toolbar, inspecteur, footer, journal).
+d'environnement ``MARKDOWN_CONVERTER_UI`` vaut ``qt``. PLO-34 a posé le
+squelette ; PLO-35 garnit la zone ``file_view`` avec la **file de conversion**
+(``QTableView`` branchée sur ``ConversionFileTableModel``) et deux boutons
+minimalistes d'ajout de sources. Les autres zones (toolbar, inspecteur,
+footer, journal) restent des placeholders jusqu'à PLO-36..PLO-39.
 
 Architecture cible (cf. ``design_handoff_ui_refonte/README.md``) ::
 
@@ -29,16 +30,22 @@ suivants de les remplir sans toucher au layout global.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from PySide6.QtWidgets import QMainWindow, QSplitter, QWidget
+    from PySide6.QtCore import QThread
+    from PySide6.QtWidgets import QLabel, QMainWindow, QPushButton, QSplitter, QTableView, QWidget
+
+    from ui_qt_conversion_worker import ConversionWorker
+    from ui_qt_file_model import ConversionFileTableModel
 
 
 WINDOW_TITLE = "Markdown Converter"
 DEFAULT_WIDTH = 1100
 DEFAULT_HEIGHT = 720
 INSPECTOR_INITIAL_WIDTH = 380
+FILE_ROW_HEIGHT = 50  # cf. design_handoff_ui_refonte/README.md
 
 
 @dataclass
@@ -59,6 +66,32 @@ class QtZones:
     journal: QWidget
 
 
+@dataclass
+class FileViewParts:
+    """Sous-widgets exposés du panneau gauche (file de conversion, PLO-35)."""
+
+    table: QTableView
+    model: ConversionFileTableModel
+    add_file_button: QWidget
+    add_folder_button: QWidget
+
+
+@dataclass
+class OutputBannerParts:
+    """Sous-widgets du bandeau « dossier de sortie » (PLO-35, minimal)."""
+
+    label: QLabel
+    choose_button: QPushButton
+
+
+@dataclass
+class FooterParts:
+    """Sous-widgets du footer minimal (PLO-35) ; sera enrichi en PLO-38."""
+
+    convert_button: QPushButton
+    status_label: QLabel
+
+
 class MarkdownConverterQtApp:
     """Squelette de la fenêtre principale PySide6.
 
@@ -74,6 +107,12 @@ class MarkdownConverterQtApp:
         self._window: QMainWindow | None = None
         self._central_splitter: QSplitter | None = None
         self.zones: QtZones | None = None
+        self.file_view_parts: FileViewParts | None = None
+        self.output_banner_parts: OutputBannerParts | None = None
+        self.footer_parts: FooterParts | None = None
+        self.output_dir: Path | None = None
+        self._worker: ConversionWorker | None = None
+        self._worker_thread: QThread | None = None
 
     def build(self) -> QMainWindow:
         """Construit et retourne la ``QMainWindow``. Ne l'affiche pas."""
@@ -99,10 +138,10 @@ class MarkdownConverterQtApp:
 
         titlebar = _named_placeholder("titlebar", "Markdown Converter")
         toolbar_area = _named_placeholder("toolbar", "Toolbar (sous-ticket #3)")
-        output_banner = _named_placeholder("output_banner", "Dossier de sortie : —")
+        output_banner, output_banner_parts = _build_output_banner()
 
         central = QSplitter(Qt.Orientation.Horizontal, root)
-        file_view = _named_placeholder("file_view", "File de conversion (sous-ticket #2)")
+        file_view, file_view_parts = _build_file_view()
         inspector = _named_placeholder("inspector", "Inspecteur (sous-ticket #4)")
         central.addWidget(file_view)
         central.addWidget(inspector)
@@ -111,7 +150,7 @@ class MarkdownConverterQtApp:
         central.setSizes([DEFAULT_WIDTH - INSPECTOR_INITIAL_WIDTH, INSPECTOR_INITIAL_WIDTH])
         central.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        footer = _named_placeholder("footer", "Footer (sous-ticket #5)")
+        footer, footer_parts = _build_footer()
         journal = _named_placeholder("journal", "Journal (sous-ticket #6) — caché par défaut")
         journal.setVisible(False)
 
@@ -134,7 +173,121 @@ class MarkdownConverterQtApp:
         )
         self._window = window
         self._central_splitter = central
+        self.file_view_parts = file_view_parts
+        self.output_banner_parts = output_banner_parts
+        self.footer_parts = footer_parts
+
+        output_banner_parts.choose_button.clicked.connect(self._on_choose_output_dir)
+        footer_parts.convert_button.clicked.connect(self._on_convert_clicked)
+        footer_parts.convert_button.setEnabled(False)
+
+        # Le bouton Convertir s'active / se désactive en fonction du contenu de
+        # la file et de la sélection d'un dossier de sortie.
+        file_view_parts.model.rowsInserted.connect(self._refresh_convert_button_state)
+        file_view_parts.model.rowsRemoved.connect(self._refresh_convert_button_state)
+        file_view_parts.model.modelReset.connect(self._refresh_convert_button_state)
+
         return window
+
+    def set_output_dir(self, output_dir: Path) -> None:
+        """Sélectionne le dossier de sortie. Met à jour le bandeau et le bouton Convertir."""
+        self.output_dir = output_dir.resolve()
+        if self.output_banner_parts is not None:
+            self.output_banner_parts.label.setText(f"Dossier de sortie : {self.output_dir}")
+        self._refresh_convert_button_state()
+
+    def _refresh_convert_button_state(self, *_: object) -> None:
+        if self.footer_parts is None or self.file_view_parts is None:
+            return
+        ready = self.output_dir is not None and bool(self.file_view_parts.model.records())
+        running = self._worker_thread is not None
+        self.footer_parts.convert_button.setEnabled(ready and not running)
+
+    def _on_choose_output_dir(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+
+        folder_str = QFileDialog.getExistingDirectory(self._window, "Choisir le dossier de sortie")
+        if folder_str:
+            self.set_output_dir(Path(folder_str))
+
+    def _on_convert_clicked(self) -> None:
+        if self.output_dir is None or self.file_view_parts is None or self.footer_parts is None:
+            return
+        from PySide6.QtCore import QThread
+
+        from ui_qt_conversion_worker import ConversionWorker
+
+        paths = [rec.source_path for rec in self.file_view_parts.model.records()]
+        if not paths:
+            return
+
+        worker = ConversionWorker(
+            explicit_files=paths,
+            directory_roots=[],
+            output_dir=self.output_dir,
+            keep_output_in_memory=True,
+        )
+        thread = QThread()
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.progress.connect(self._on_worker_progress)
+        worker.finished.connect(self._on_worker_finished)
+        worker.failed.connect(self._on_worker_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(self._clear_worker_refs)
+
+        self._worker = worker
+        self._worker_thread = thread
+        self.footer_parts.convert_button.setEnabled(False)
+        self.footer_parts.status_label.setText("Conversion en cours…")
+        thread.start()
+
+    def _on_worker_progress(self, index: int, total: int, label: str, percent: float) -> None:
+        if self.file_view_parts is None or self.footer_parts is None:
+            return
+        records = self.file_view_parts.model.records()
+        if total <= 0 or not records:
+            return
+        from converter import ConversionStatus
+
+        row = index if index < len(records) else len(records) - 1
+        rec = records[row]
+        rec.progress_percent = max(0.0, min(1.0, percent * total - row))
+        if rec.status == ConversionStatus.QUEUED:
+            rec.status = ConversionStatus.PROCESSING
+        self.file_view_parts.model.refresh_row(row)
+        self.footer_parts.status_label.setText(
+            f"Conversion en cours… {label} ({round(percent * 100)} %)"
+        )
+
+    def _on_worker_finished(self, summary: object) -> None:
+        if self.file_view_parts is None or self.footer_parts is None:
+            return
+        from converter import ConversionStatus, ConversionSummary
+
+        if not isinstance(summary, ConversionSummary):
+            return
+        self.file_view_parts.model.set_records(list(summary.records))
+        errors = sum(1 for r in summary.records if r.status == ConversionStatus.ERROR)
+        self.footer_parts.status_label.setText(
+            f"Terminé · {len(summary.records)} fichier(s), {errors} erreur(s)."
+        )
+        self._refresh_convert_button_state()
+
+    def _on_worker_failed(self, error_text: str) -> None:
+        if self.footer_parts is None:
+            return
+        first_line = error_text.splitlines()[0] if error_text else "Échec de la conversion."
+        self.footer_parts.status_label.setText(f"Échec : {first_line}")
+        self._refresh_convert_button_state()
+
+    def _clear_worker_refs(self) -> None:
+        self._worker = None
+        self._worker_thread = None
+        self._refresh_convert_button_state()
 
 
 def _named_placeholder(name: str, text: str) -> QWidget:
@@ -153,17 +306,191 @@ def _named_placeholder(name: str, text: str) -> QWidget:
     return frame
 
 
+def _build_output_banner() -> tuple[QWidget, OutputBannerParts]:
+    """Bandeau « Dossier de sortie » minimal (PLO-35) avec un bouton ``Choisir…``."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
+
+    frame = QFrame()
+    frame.setObjectName("output_banner")
+    frame.setFrameShape(QFrame.Shape.StyledPanel)
+    layout = QHBoxLayout(frame)
+    layout.setContentsMargins(12, 8, 12, 8)
+    layout.setSpacing(8)
+    label = QLabel("Dossier de sortie : —", frame)
+    label.setObjectName("output_banner_label")
+    label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+    button = QPushButton("Choisir…", frame)
+    button.setObjectName("output_banner_choose")
+    layout.addWidget(label, stretch=1)
+    layout.addWidget(button)
+    return frame, OutputBannerParts(label=label, choose_button=button)
+
+
+def _build_footer() -> tuple[QWidget, FooterParts]:
+    """Footer minimal (PLO-35) : statut + bouton **Convertir** primaire."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
+
+    frame = QFrame()
+    frame.setObjectName("footer")
+    frame.setFrameShape(QFrame.Shape.StyledPanel)
+    layout = QHBoxLayout(frame)
+    layout.setContentsMargins(12, 8, 12, 8)
+    layout.setSpacing(8)
+    status = QLabel("Prêt.", frame)
+    status.setObjectName("footer_status")
+    status.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+    convert = QPushButton("Convertir", frame)
+    convert.setObjectName("footer_convert")
+    convert.setDefault(True)
+    layout.addWidget(status, stretch=1)
+    layout.addWidget(convert)
+    return frame, FooterParts(convert_button=convert, status_label=status)
+
+
+def _build_file_view() -> tuple[QWidget, FileViewParts]:
+    """Construit la zone gauche : mini-toolbar (Fichier / Dossier) + ``QTableView``.
+
+    Le toolbar complet (recherche, chips de filtre…) viendra au sous-ticket #3.
+    """
+    from PySide6.QtWidgets import (
+        QFrame,
+        QHBoxLayout,
+        QHeaderView,
+        QPushButton,
+        QSizePolicy,
+        QTableView,
+        QVBoxLayout,
+    )
+
+    from ui_qt_file_model import ConversionFileTableModel
+
+    frame = QFrame()
+    frame.setObjectName("file_view")
+    frame.setFrameShape(QFrame.Shape.StyledPanel)
+
+    root_layout = QVBoxLayout(frame)
+    root_layout.setContentsMargins(0, 0, 0, 0)
+    root_layout.setSpacing(0)
+
+    toolbar = QFrame(frame)
+    toolbar.setObjectName("file_view_toolbar")
+    toolbar_layout = QHBoxLayout(toolbar)
+    toolbar_layout.setContentsMargins(12, 8, 12, 8)
+    toolbar_layout.setSpacing(8)
+    add_file_btn = QPushButton("+ Fichiers", toolbar)
+    add_file_btn.setObjectName("file_view_add_file")
+    add_folder_btn = QPushButton("Dossier…", toolbar)
+    add_folder_btn.setObjectName("file_view_add_folder")
+    toolbar_layout.addWidget(add_file_btn)
+    toolbar_layout.addWidget(add_folder_btn)
+    toolbar_layout.addStretch(1)
+
+    model = ConversionFileTableModel()
+    table = QTableView(frame)
+    table.setObjectName("file_view_table")
+    table.setModel(model)
+    table.setSortingEnabled(True)
+    table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+    table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+    table.setAlternatingRowColors(True)
+    table.verticalHeader().setVisible(False)
+    table.verticalHeader().setDefaultSectionSize(FILE_ROW_HEIGHT)
+    table.horizontalHeader().setStretchLastSection(False)
+    table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    for col in (2, 3, 4):
+        table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+    table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+    root_layout.addWidget(toolbar)
+    root_layout.addWidget(table, stretch=1)
+
+    add_file_btn.clicked.connect(lambda: _on_add_files_clicked(frame, model))
+    add_folder_btn.clicked.connect(lambda: _on_add_folder_clicked(frame, model))
+
+    return frame, FileViewParts(
+        table=table,
+        model=model,
+        add_file_button=add_file_btn,
+        add_folder_button=add_folder_btn,
+    )
+
+
+def _on_add_files_clicked(parent: QWidget, model: ConversionFileTableModel) -> None:
+    from PySide6.QtWidgets import QFileDialog
+
+    from utils import SUPPORTED_EXTENSIONS
+
+    pattern = " ".join(f"*{ext}" for ext in sorted(SUPPORTED_EXTENSIONS))
+    paths_str, _ = QFileDialog.getOpenFileNames(
+        parent,
+        "Ajouter des fichiers",
+        "",
+        f"Fichiers pris en charge ({pattern});;Tous les fichiers (*)",
+    )
+    add_paths_to_model(model, [Path(p) for p in paths_str])
+
+
+def _on_add_folder_clicked(parent: QWidget, model: ConversionFileTableModel) -> None:
+    from PySide6.QtWidgets import QFileDialog
+
+    folder_str = QFileDialog.getExistingDirectory(parent, "Ajouter un dossier")
+    if not folder_str:
+        return
+    from utils import collect_supported_files_under_directory
+
+    add_paths_to_model(model, collect_supported_files_under_directory(Path(folder_str)))
+
+
+def add_paths_to_model(model: ConversionFileTableModel, paths: list[Path]) -> list[Path]:
+    """Ajoute les chemins inconnus à ``model`` en statut ``QUEUED``.
+
+    Retourne la liste des chemins effectivement ajoutés (utile pour les tests
+    et pour un futur message footer).
+    """
+    from converter import ConversionStatus, FileConversionRecord
+    from utils import is_supported_path
+
+    existing = {rec.source_path.resolve() for rec in model.records()}
+    added: list[Path] = []
+    for p in paths:
+        rp = p.resolve()
+        if rp in existing or not is_supported_path(rp):
+            continue
+        model.append_record(
+            FileConversionRecord(
+                source_path=rp,
+                status=ConversionStatus.QUEUED,
+            )
+        )
+        existing.add(rp)
+        added.append(rp)
+    return added
+
+
 def run_app() -> None:
     """Lance la boucle Qt.
 
     Conçu pour être appelé depuis ``main.py`` à la place de ``ui.run_app``
     quand ``MARKDOWN_CONVERTER_UI=qt``.
+
+    Important : on garde une référence locale forte à ``qt_app``. PySide6
+    connecte les bound methods via une **référence faible** ; sans cette
+    variable, le GC peut libérer l'instance dès la sortie de cette fonction
+    locale et invalider silencieusement les slots (boutons qui ne réagissent
+    plus, etc.). Conserver ``qt_app`` jusqu'à la fin de ``app.exec()``
+    garantit que les slots restent appelables.
     """
     import sys
 
     from PySide6.QtWidgets import QApplication
 
     app = QApplication.instance() or QApplication(sys.argv)
-    window = MarkdownConverterQtApp().build()
+    qt_app = MarkdownConverterQtApp()
+    window = qt_app.build()
     window.show()
-    sys.exit(app.exec())
+    exit_code = app.exec()
+    del qt_app  # explicite : la référence ne sert plus une fois exec() rendu
+    sys.exit(exit_code)

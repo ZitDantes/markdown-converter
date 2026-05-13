@@ -27,6 +27,8 @@ def test_import_ui_qt_without_pyside6_does_not_fail() -> None:
     module = importlib.import_module("ui_qt")
     assert hasattr(module, "MarkdownConverterQtApp")
     assert hasattr(module, "QtZones")
+    assert hasattr(module, "FileViewParts")
+    assert hasattr(module, "add_paths_to_model")
     assert hasattr(module, "run_app")
 
 
@@ -78,3 +80,68 @@ def test_journal_is_hidden_by_default(qt_app: object) -> None:
     app.build()
     assert app.zones is not None
     assert app.zones.journal.isVisible() is False
+
+
+def test_file_view_parts_exposed_after_build(qt_app: object) -> None:
+    from ui_qt import FileViewParts, MarkdownConverterQtApp
+    from ui_qt_file_model import ConversionFileTableModel
+
+    app = MarkdownConverterQtApp()
+    app.build()
+    parts = app.file_view_parts
+    assert isinstance(parts, FileViewParts)
+    assert isinstance(parts.model, ConversionFileTableModel)
+    assert parts.table.model() is parts.model
+    assert parts.add_file_button.objectName() == "file_view_add_file"
+    assert parts.add_folder_button.objectName() == "file_view_add_folder"
+
+
+def test_add_paths_to_model_filters_and_dedupes(qt_app: object, tmp_path: object) -> None:
+    from converter import ConversionStatus
+    from ui_qt import add_paths_to_model
+    from ui_qt_file_model import ConversionFileTableModel
+
+    supported = tmp_path / "doc.docx"
+    supported.write_bytes(b"x")
+    unsupported = tmp_path / "weird.zzz"
+    unsupported.write_bytes(b"x")
+
+    model = ConversionFileTableModel()
+    added = add_paths_to_model(model, [supported, unsupported, supported])
+    assert [p.name for p in added] == ["doc.docx"]
+    assert len(model.records()) == 1
+    assert model.records()[0].status == ConversionStatus.QUEUED
+
+    again = add_paths_to_model(model, [supported])
+    assert again == []
+    assert len(model.records()) == 1
+
+
+def test_convert_button_disabled_until_files_and_output(qt_app: object, tmp_path: object) -> None:
+    from ui_qt import MarkdownConverterQtApp, add_paths_to_model
+
+    app = MarkdownConverterQtApp()
+    app.build()
+    assert app.footer_parts is not None
+    assert app.file_view_parts is not None
+
+    assert app.footer_parts.convert_button.isEnabled() is False
+
+    src = tmp_path / "doc.docx"
+    src.write_bytes(b"x")
+    add_paths_to_model(app.file_view_parts.model, [src])
+    assert app.footer_parts.convert_button.isEnabled() is False
+
+    app.set_output_dir(tmp_path / "out")
+    assert app.footer_parts.convert_button.isEnabled() is True
+
+
+def test_set_output_dir_updates_banner(qt_app: object, tmp_path: object) -> None:
+    from ui_qt import MarkdownConverterQtApp
+
+    app = MarkdownConverterQtApp()
+    app.build()
+    target = tmp_path / "out"
+    app.set_output_dir(target)
+    assert app.output_banner_parts is not None
+    assert str(target.resolve()) in app.output_banner_parts.label.text()
