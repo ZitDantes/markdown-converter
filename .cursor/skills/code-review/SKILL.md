@@ -145,6 +145,16 @@ Selon le verdict, proposer (et attendre un « ok » explicite avant exécution) 
 - **Comment**
   - `gh pr review <num> --comment --body "<remarques>"`
 
+#### Contrainte spécifique à ce projet : self-approve impossible
+
+GitHub interdit qu'un utilisateur fasse `--approve` sur une PR qu'il a lui-même authorée. Or, sur ce projet, **l'agent commit sous l'identité unique `ZitDantes`** (le seul collaborateur du repo) via `gh CLI`. Donc :
+
+- `gh pr review <num> --approve` retournera systématiquement `Review Can not approve your own pull request`.
+- **Fallback recommandé** : utiliser `gh pr review <num> --comment` qui pose la review structurée en commentaire (autorisé) et laisser l'humain merger directement depuis l'UI GitHub ou Linear Diffs.
+- Le co-author `cursoragent` visible dans les commits **n'est pas** un collaborateur du repo et n'a pas de token authentifié sur cette machine : on ne peut donc pas s'authentifier en son nom pour approuver.
+
+Cette contrainte reste vraie même si Linear Diffs est activé (Linear utilise ton compte GitHub personnel pour pousser les actions). Pour avoir des reviews automatiques sous un autre compte, il faudrait passer par **BugBot** (le bot Cursor) — étudié dans un ticket séparé.
+
 ## Anti-patterns
 
 - ❌ Annoncer « PR approuvée » dans le chat sans avoir lancé la checklist.
