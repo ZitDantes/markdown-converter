@@ -43,6 +43,31 @@ def test_converts_simple_txt_to_markdown(tmp_path: Path, fixtures_dir: Path) -> 
     assert any(level == "INFO" for level, _ in callbacks)
 
 
+def test_converts_simple_html_to_markdown(tmp_path: Path, fixtures_dir: Path) -> None:
+    """Cas nominal HTML : la conversion produit un .md non vide contenant le contenu cible."""
+    src = tmp_path / "simple.html"
+    shutil.copy(fixtures_dir / "simple.html", src)
+    output_dir = tmp_path / "out"
+
+    summary = convert_files(
+        explicit_files=[src],
+        directory_roots=[],
+        output_dir=output_dir,
+    )
+
+    assert len(summary.records) == 1
+    record = summary.records[0]
+    assert record.status is ConversionStatus.SUCCESS
+    assert record.output_path is not None
+    assert record.output_path.exists()
+
+    content = record.output_path.read_text(encoding="utf-8")
+    assert content.startswith("---")  # front-matter YAML
+    # Le titre et au moins un item de la liste doivent survivre à la conversion HTML.
+    assert "Page de test" in content
+    assert "Premier item" in content
+
+
 def test_unsupported_extension_yields_unsupported_record(tmp_path: Path) -> None:
     """Cas dégradé : une extension inconnue produit un record UNSUPPORTED + warning."""
     bad = tmp_path / "data.xyz"
