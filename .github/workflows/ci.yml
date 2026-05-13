@@ -91,6 +91,10 @@ jobs:
           assert a.file_view_parts is not None
           assert a.file_view_parts.model.columnCount() == 5
           assert a.output_banner_parts is not None
+          assert a.output_banner_parts.error_label.objectName() == "output_banner_error"
+          assert a.toolbar_parts is not None
+          assert a.toolbar_parts.search_input.objectName() == "toolbar_search"
+          assert a.file_view_parts.clear_button.objectName() == "file_view_clear"
           assert a.footer_parts is not None
           assert a.footer_parts.convert_button.isEnabled() is False
           print("UI Qt offscreen OK :", a.zones.titlebar.objectName())
