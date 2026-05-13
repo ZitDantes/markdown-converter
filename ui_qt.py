@@ -3,10 +3,11 @@ Interface PySide6 du Markdown Converter (prototype).
 
 Ce module est **désactivé par défaut** : il n'est utilisé que si la variable
 d'environnement ``MARKDOWN_CONVERTER_UI`` vaut ``qt``. PLO-34 a posé le
-squelette ; PLO-35 garnit la zone ``file_view`` avec la **file de conversion**
-(``QTableView`` branchée sur ``ConversionFileTableModel``) et deux boutons
-minimalistes d'ajout de sources. Les autres zones (toolbar, inspecteur,
-footer, journal) restent des placeholders jusqu'à PLO-36..PLO-39.
+squelette ; PLO-35 a livré la file et le worker ; PLO-36 garnit la **toolbar**
+(chips, recherche) et renforce le **bandeau de sortie** (validation écriture)
+ainsi que le bouton **Vider** sur la file. Le rendu reste volontairement
+sobre (mockup fonctionnel) ; le polish visuel arrive avec PLO-28 et les
+tickets suivants.
 
 Architecture cible (cf. ``design_handoff_ui_refonte/README.md``) ::
 
@@ -29,16 +30,26 @@ suivants de les remplir sans toucher au layout global.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QThread
-    from PySide6.QtWidgets import QLabel, QMainWindow, QPushButton, QSplitter, QTableView, QWidget
+    from PySide6.QtWidgets import (
+        QLabel,
+        QLineEdit,
+        QMainWindow,
+        QPushButton,
+        QSplitter,
+        QTableView,
+        QWidget,
+    )
 
     from ui_qt_conversion_worker import ConversionWorker
     from ui_qt_file_model import ConversionFileTableModel
+    from ui_qt_file_proxy import ConversionFileFilterProxy
 
 
 WINDOW_TITLE = "Markdown Converter"
@@ -46,6 +57,17 @@ DEFAULT_WIDTH = 1100
 DEFAULT_HEIGHT = 720
 INSPECTOR_INITIAL_WIDTH = 380
 FILE_ROW_HEIGHT = 50  # cf. design_handoff_ui_refonte/README.md
+
+
+def _validate_output_dir(path: Path) -> tuple[bool, str]:
+    """Vérifie qu'un dossier de sortie est utilisable (existe, dossier, écriture)."""
+    if not path.exists():
+        return False, "Le dossier n'existe pas."
+    if not path.is_dir():
+        return False, "Le chemin désigné n'est pas un dossier."
+    if not os.access(path, os.W_OK):
+        return False, "Ce dossier n'est pas accessible en écriture."
+    return True, ""
 
 
 @dataclass
@@ -68,20 +90,31 @@ class QtZones:
 
 @dataclass
 class FileViewParts:
-    """Sous-widgets exposés du panneau gauche (file de conversion, PLO-35)."""
+    """Sous-widgets exposés du panneau gauche (file de conversion, PLO-35/36)."""
 
     table: QTableView
     model: ConversionFileTableModel
+    proxy: ConversionFileFilterProxy
     add_file_button: QWidget
     add_folder_button: QWidget
+    clear_button: QWidget
+
+
+@dataclass
+class ToolbarParts:
+    """Toolbar Qt (PLO-36) : champ de recherche + chips de filtre par extension."""
+
+    search_input: QLineEdit
+    chip_buttons: dict[str, QPushButton]
 
 
 @dataclass
 class OutputBannerParts:
-    """Sous-widgets du bandeau « dossier de sortie » (PLO-35, minimal)."""
+    """Sous-widgets du bandeau « dossier de sortie » (PLO-35/36)."""
 
     label: QLabel
     choose_button: QPushButton
+    error_label: QLabel
 
 
 @dataclass
@@ -108,6 +141,7 @@ class MarkdownConverterQtApp:
         self._central_splitter: QSplitter | None = None
         self.zones: QtZones | None = None
         self.file_view_parts: FileViewParts | None = None
+        self.toolbar_parts: ToolbarParts | None = None
         self.output_banner_parts: OutputBannerParts | None = None
         self.footer_parts: FooterParts | None = None
         self.output_dir: Path | None = None
@@ -137,11 +171,11 @@ class MarkdownConverterQtApp:
         root_layout.setSpacing(0)
 
         titlebar = _named_placeholder("titlebar", "Markdown Converter")
-        toolbar_area = _named_placeholder("toolbar", "Toolbar (sous-ticket #3)")
         output_banner, output_banner_parts = _build_output_banner()
 
         central = QSplitter(Qt.Orientation.Horizontal, root)
         file_view, file_view_parts = _build_file_view()
+        toolbar_area, toolbar_parts = _build_toolbar(file_view_parts.model)
         inspector = _named_placeholder("inspector", "Inspecteur (sous-ticket #4)")
         central.addWidget(file_view)
         central.addWidget(inspector)
@@ -174,12 +208,14 @@ class MarkdownConverterQtApp:
         self._window = window
         self._central_splitter = central
         self.file_view_parts = file_view_parts
+        self.toolbar_parts = toolbar_parts
         self.output_banner_parts = output_banner_parts
         self.footer_parts = footer_parts
 
         output_banner_parts.choose_button.clicked.connect(self._on_choose_output_dir)
         footer_parts.convert_button.clicked.connect(self._on_convert_clicked)
         footer_parts.convert_button.setEnabled(False)
+        file_view_parts.clear_button.clicked.connect(self._on_clear_file_list)
 
         # Le bouton Convertir s'active / se désactive en fonction du contenu de
         # la file et de la sélection d'un dossier de sortie.
@@ -187,14 +223,54 @@ class MarkdownConverterQtApp:
         file_view_parts.model.rowsRemoved.connect(self._refresh_convert_button_state)
         file_view_parts.model.modelReset.connect(self._refresh_convert_button_state)
 
+        _wire_toolbar(toolbar_parts, file_view_parts)
+
         return window
 
     def set_output_dir(self, output_dir: Path) -> None:
-        """Sélectionne le dossier de sortie. Met à jour le bandeau et le bouton Convertir."""
-        self.output_dir = output_dir.resolve()
+        """Sélectionne le dossier de sortie après validation (existence + écriture)."""
+        resolved = output_dir.resolve()
+        ok, err = _validate_output_dir(resolved)
         if self.output_banner_parts is not None:
-            self.output_banner_parts.label.setText(f"Dossier de sortie : {self.output_dir}")
+            if not ok:
+                self.output_banner_parts.error_label.setText(err)
+                self.output_banner_parts.error_label.setVisible(True)
+                self.output_banner_parts.error_label.show()
+                return
+            self.output_banner_parts.error_label.clear()
+            self.output_banner_parts.error_label.setVisible(False)
+            self.output_banner_parts.label.setText(f"Dossier de sortie : {resolved}")
+        self.output_dir = resolved
         self._refresh_convert_button_state()
+
+    def _on_clear_file_list(self) -> None:
+        if self.file_view_parts is None or self.toolbar_parts is None:
+            return
+        model = self.file_view_parts.model
+        if not model.records():
+            return
+        from PySide6.QtWidgets import QMessageBox
+
+        n = len(model.records())
+        reply = QMessageBox.question(
+            self._window,
+            "Vider la file",
+            f"Voulez-vous retirer les {n} fichier(s) de la file ?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        model.clear()
+        self.toolbar_parts.search_input.blockSignals(True)
+        self.toolbar_parts.search_input.clear()
+        self.toolbar_parts.search_input.blockSignals(False)
+        for btn in self.toolbar_parts.chip_buttons.values():
+            btn.blockSignals(True)
+            btn.setChecked(False)
+            btn.blockSignals(False)
+        self.file_view_parts.proxy.set_active_extensions(set())
+        self.file_view_parts.proxy.set_name_filter("")
 
     def _refresh_convert_button_state(self, *_: object) -> None:
         if self.footer_parts is None or self.file_view_parts is None:
@@ -307,24 +383,38 @@ def _named_placeholder(name: str, text: str) -> QWidget:
 
 
 def _build_output_banner() -> tuple[QWidget, OutputBannerParts]:
-    """Bandeau « Dossier de sortie » minimal (PLO-35) avec un bouton ``Choisir…``."""
+    """Bandeau « Dossier de sortie » : libellé, erreur éventuelle, bouton ``Choisir…``."""
     from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
+    from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
     frame = QFrame()
     frame.setObjectName("output_banner")
     frame.setFrameShape(QFrame.Shape.StyledPanel)
-    layout = QHBoxLayout(frame)
-    layout.setContentsMargins(12, 8, 12, 8)
-    layout.setSpacing(8)
+    frame.setMinimumHeight(72)
+    outer = QVBoxLayout(frame)
+    outer.setContentsMargins(12, 10, 12, 10)
+    outer.setSpacing(4)
+    row = QHBoxLayout()
+    row.setSpacing(8)
     label = QLabel("Dossier de sortie : —", frame)
     label.setObjectName("output_banner_label")
     label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
     button = QPushButton("Choisir…", frame)
     button.setObjectName("output_banner_choose")
-    layout.addWidget(label, stretch=1)
-    layout.addWidget(button)
-    return frame, OutputBannerParts(label=label, choose_button=button)
+    button.setToolTip(
+        "Choisir un dossier existant où seront écrits les fichiers Markdown. "
+        "Le programme vérifie que vous avez le droit d'y écrire."
+    )
+    row.addWidget(label, stretch=1)
+    row.addWidget(button)
+    outer.addLayout(row)
+    error_label = QLabel("", frame)
+    error_label.setObjectName("output_banner_error")
+    error_label.setWordWrap(True)
+    error_label.setVisible(False)
+    error_label.setStyleSheet("color: #b00020;")
+    outer.addWidget(error_label)
+    return frame, OutputBannerParts(label=label, choose_button=button, error_label=error_label)
 
 
 def _build_footer() -> tuple[QWidget, FooterParts]:
@@ -352,7 +442,9 @@ def _build_footer() -> tuple[QWidget, FooterParts]:
 def _build_file_view() -> tuple[QWidget, FileViewParts]:
     """Construit la zone gauche : mini-toolbar (Fichier / Dossier) + ``QTableView``.
 
-    Le toolbar complet (recherche, chips de filtre…) viendra au sous-ticket #3.
+    La table consomme un ``ConversionFileFilterProxy`` qui enveloppe le modèle
+    source — les chips et la recherche de la toolbar (PLO-36) modifient ce
+    proxy sans toucher au modèle.
     """
     from PySide6.QtWidgets import (
         QFrame,
@@ -365,6 +457,7 @@ def _build_file_view() -> tuple[QWidget, FileViewParts]:
     )
 
     from ui_qt_file_model import ConversionFileTableModel
+    from ui_qt_file_proxy import ConversionFileFilterProxy
 
     frame = QFrame()
     frame.setObjectName("file_view")
@@ -383,14 +476,19 @@ def _build_file_view() -> tuple[QWidget, FileViewParts]:
     add_file_btn.setObjectName("file_view_add_file")
     add_folder_btn = QPushButton("Dossier…", toolbar)
     add_folder_btn.setObjectName("file_view_add_folder")
+    clear_btn = QPushButton("Vider", toolbar)
+    clear_btn.setObjectName("file_view_clear")
+    clear_btn.setToolTip("Retirer tous les fichiers de la file (demande confirmation).")
     toolbar_layout.addWidget(add_file_btn)
     toolbar_layout.addWidget(add_folder_btn)
+    toolbar_layout.addWidget(clear_btn)
     toolbar_layout.addStretch(1)
 
     model = ConversionFileTableModel()
+    proxy = ConversionFileFilterProxy(model)
     table = QTableView(frame)
     table.setObjectName("file_view_table")
-    table.setModel(model)
+    table.setModel(proxy)
     table.setSortingEnabled(True)
     table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
     table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
@@ -413,9 +511,103 @@ def _build_file_view() -> tuple[QWidget, FileViewParts]:
     return frame, FileViewParts(
         table=table,
         model=model,
+        proxy=proxy,
         add_file_button=add_file_btn,
         add_folder_button=add_folder_btn,
+        clear_button=clear_btn,
     )
+
+
+# Ordre stable des chips dans la toolbar. On garde l'ordre d'apparition naturelle
+# dans le design handoff (du plus fréquent au moins fréquent côté usage).
+_CHIP_EXTENSIONS: tuple[str, ...] = (".docx", ".pdf", ".pptx", ".xlsx", ".html", ".txt")
+
+
+def _build_toolbar(source_model: ConversionFileTableModel) -> tuple[QWidget, ToolbarParts]:
+    """Toolbar : chips de filtre par extension (avec compteurs) + champ de recherche."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QColor, QPalette
+    from PySide6.QtWidgets import (
+        QFrame,
+        QHBoxLayout,
+        QLineEdit,
+        QPushButton,
+        QSizePolicy,
+    )
+
+    from ui_qt_file_model import format_accent_hex
+
+    frame = QFrame()
+    frame.setObjectName("toolbar")
+    frame.setFrameShape(QFrame.Shape.StyledPanel)
+    layout = QHBoxLayout(frame)
+    layout.setContentsMargins(12, 8, 12, 8)
+    layout.setSpacing(8)
+
+    chip_buttons: dict[str, QPushButton] = {}
+    for ext in _CHIP_EXTENSIONS:
+        btn = QPushButton(_chip_label(ext, 0), frame)
+        btn.setObjectName(f"toolbar_chip_{ext.lstrip('.')}")
+        btn.setCheckable(True)
+        btn.setAutoExclusive(False)
+        btn.setToolTip(f"Filtrer la file pour ne montrer que les {ext}")
+        accent = QColor(format_accent_hex(ext))
+        palette = btn.palette()
+        palette.setColor(QPalette.ColorRole.Button, accent)
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor("#ffffff"))
+        btn.setPalette(palette)
+        layout.addWidget(btn)
+        chip_buttons[ext] = btn
+
+    layout.addStretch(1)
+
+    search = QLineEdit(frame)
+    search.setObjectName("toolbar_search")
+    search.setPlaceholderText("Rechercher un fichier…")
+    search.setClearButtonEnabled(True)
+    search.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    search.setMinimumWidth(240)
+    search.setMaximumWidth(360)
+    layout.addWidget(search)
+    _ = Qt  # silencieux : import gardé pour les variantes futures
+
+    parts = ToolbarParts(search_input=search, chip_buttons=chip_buttons)
+    _refresh_chip_counters(parts, source_model)
+    source_model.rowsInserted.connect(lambda *_: _refresh_chip_counters(parts, source_model))
+    source_model.rowsRemoved.connect(lambda *_: _refresh_chip_counters(parts, source_model))
+    source_model.modelReset.connect(lambda: _refresh_chip_counters(parts, source_model))
+    return frame, parts
+
+
+def _wire_toolbar(toolbar_parts: ToolbarParts, file_view_parts: FileViewParts) -> None:
+    """Connecte chips et recherche au proxy."""
+    proxy = file_view_parts.proxy
+
+    def _apply_active_extensions() -> None:
+        active = {ext for ext, btn in toolbar_parts.chip_buttons.items() if btn.isChecked()}
+        proxy.set_active_extensions(active)
+
+    for btn in toolbar_parts.chip_buttons.values():
+        btn.toggled.connect(lambda _checked=False: _apply_active_extensions())
+
+    toolbar_parts.search_input.textChanged.connect(proxy.set_name_filter)
+
+
+def _chip_label(ext: str, count: int) -> str:
+    return f"{ext}  {count}"
+
+
+def _refresh_chip_counters(parts: ToolbarParts, source_model: ConversionFileTableModel) -> None:
+    """Recompte les fichiers par extension sur le **modèle source** (pas le proxy)."""
+    from utils import normalize_extension
+
+    counts: dict[str, int] = {ext: 0 for ext in parts.chip_buttons}
+    for rec in source_model.records():
+        ext = normalize_extension(rec.source_path)
+        if ext in counts:
+            counts[ext] += 1
+    for ext, btn in parts.chip_buttons.items():
+        btn.setText(_chip_label(ext, counts[ext]))
 
 
 def _on_add_files_clicked(parent: QWidget, model: ConversionFileTableModel) -> None:
