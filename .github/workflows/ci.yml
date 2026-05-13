@@ -34,6 +34,7 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
+            requirements-qt.txt
 
       - name: Installer les dépendances
         run: |
@@ -54,3 +55,28 @@ jobs:
 
       - name: Pytest
         run: pytest
+
+      # Bibliothèques système requises par PySide6/Qt6 sur Ubuntu, même en mode
+      # offscreen (Qt charge libEGL pour ses plugins de plateforme).
+      # `apt-get update` a déjà été fait à l'étape « Installer Pandoc ».
+      - name: Installer les libs système Qt (Ubuntu)
+        if: matrix.python-version == '3.12'
+        run: sudo apt-get install -y --no-install-recommends libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+
+      # Installation pip des dépendances Qt isolée : peut échouer pour des raisons
+      # indépendantes du code (wheels manquants, miroir indisponible, etc.).
+      # Si l'install échoue, le smoke suivant est sauté (cf. `if:`) et la CI
+      # reste verte ; en revanche une régression du code Qt avec install OK
+      # fera bien échouer la matrice.
+      - name: Installer PySide6 (optionnel, smoke UI Qt)
+        id: install_qt
+        if: matrix.python-version == '3.12'
+        continue-on-error: true
+        run: pip install -r requirements-qt.txt
+
+      - name: Smoke UI Qt (offscreen)
+        if: matrix.python-version == '3.12' && steps.install_qt.outcome == 'success'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python -c "import sys; from PySide6.QtWidgets import QApplication; from ui_qt import MarkdownConverterQtApp; app = QApplication(sys.argv); a = MarkdownConverterQtApp(); a.build(); assert a.zones is not None and a.zones.journal.isVisible() is False; print('UI Qt offscreen OK, journal caché:', a.zones.titlebar.objectName())"

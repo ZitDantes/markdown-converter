@@ -207,7 +207,9 @@ Pour **contribuer au code** (correctifs, évolutions, documentation technique), 
 |--------------------|------|
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Guide de contribution (humains) : setup, lint, tests, PR, dépendances. |
 | `main.py` | Lancement de l’application. |
-| `ui.py` | Interface Tkinter (français). |
+| `ui.py` | Interface Tkinter (français, **par défaut**). |
+| `ui_qt.py` | Interface PySide6 (**prototype**, opt-in via `MARKDOWN_CONVERTER_UI=qt`, voir [Prototype d'UI PySide6](#prototype-dui-pyside6)). |
+| `requirements-qt.txt` | Dépendances optionnelles pour le prototype Qt (`PySide6`). |
 | `converter.py` | Orchestration du lot (boucle, statut par fichier, rapport). |
 | `engines/` | Moteurs de conversion isolés derrière une interface commune. |
 | `engines/base.py` | Classe abstraite `ConverterEngine` et exceptions custom. |
@@ -226,6 +228,18 @@ Pour **contribuer au code** (correctifs, évolutions, documentation technique), 
 L'API de `converter.py` (callbacks `on_log(level, message)` / `on_progress(index, total, label[, percent])`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier. Le quatrième argument `percent` (0.0-1.0, part globale du lot) est optionnel : les callbacks à trois arguments restent valides. Le callback `on_log` est branché en interne sur le logger nommé `markdown_converter` ; tout passe donc aussi par le fichier de log persistant (voir [Logs et diagnostic](#logs-et-diagnostic)).
 
 Pour les UIs qui veulent afficher un **aperçu** du Markdown produit sans relire le disque, `convert_files(..., keep_output_in_memory=True)` remplit `FileConversionRecord.output_md_text` avec le contenu exact écrit (front-matter + corps). Par défaut le champ reste `None` pour éviter de charger inutilement la RAM sur de gros lots.
+
+#### Prototype d'UI PySide6
+
+L'interface Tkinter (`ui.py`) reste l'UI par défaut. Une refonte en PySide6 est en cours dans `ui_qt.py` (épic [PLO-26](https://linear.app/dantes/issue/PLO-26)). Pour l'essayer :
+
+```bash
+source .venv/bin/activate
+pip install -r requirements-qt.txt   # ajoute PySide6 (dépendance facultative)
+MARKDOWN_CONVERTER_UI=qt python3 main.py
+```
+
+À ce stade (PLO-34), seul le **squelette** est livré : fenêtre principale, zones nommées, aucun comportement fonctionnel. Les fonctionnalités complètes arrivent dans les sous-tickets [PLO-35](https://linear.app/dantes/issue/PLO-35) à [PLO-39](https://linear.app/dantes/issue/PLO-39). Si PySide6 n'est pas installé alors que `MARKDOWN_CONVERTER_UI=qt`, l'application affiche un message et retombe automatiquement sur Tkinter.
 
 #### Ajouter un moteur de conversion
 
