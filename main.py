@@ -1,5 +1,5 @@
 """
-Point d'entrée : lance l'interface graphique du Convertisseur Markdown IA.
+Point d'entrée : lance l'interface graphique de Markdown Converter.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ def _fail_python_version() -> None:
 
         root = tk.Tk()
         root.withdraw()
-        messagebox.showerror("Convertisseur Markdown IA — version de Python", msg)
+        messagebox.showerror("Markdown Converter — version de Python", msg)
         root.destroy()
     except Exception:  # noqa: BLE001
         print(msg, file=sys.stderr)

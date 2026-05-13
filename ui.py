@@ -1,5 +1,5 @@
 """
-Interface graphique Tkinter (français) pour le convertisseur Markdown.
+Interface graphique Tkinter (français) pour Markdown Converter.
 """
 
 from __future__ import annotations
@@ -26,12 +26,12 @@ LEVEL_COLOR: dict[str, str] = {
 }
 
 
-class ConvertisseurApp(tk.Tk):
+class MarkdownConverterApp(tk.Tk):
     """Fenêtre principale."""
 
     def __init__(self) -> None:
         super().__init__()
-        self.title("Convertisseur Markdown IA")
+        self.title("Markdown Converter")
         self.minsize(720, 520)
 
         self._explicit_files: list[Path] = []
@@ -225,5 +225,5 @@ class ConvertisseurApp(tk.Tk):
 
 
 def run_app() -> None:
-    app = ConvertisseurApp()
+    app = MarkdownConverterApp()
     app.mainloop()

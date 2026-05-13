@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 Fichier de build PyInstaller pour macOS (.app sans console).
-Usage : pyinstaller ConvertisseurMarkdownIA.spec
+Usage : pyinstaller MarkdownConverter.spec
 """
 from PyInstaller.utils.hooks import collect_all
 
@@ -36,7 +36,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="Convertisseur Markdown IA",
+    name="Markdown Converter",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -57,14 +57,14 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="Convertisseur Markdown IA",
+    name="Markdown Converter",
 )
 
 app = BUNDLE(
     coll,
-    name="Convertisseur Markdown IA.app",
+    name="Markdown Converter.app",
     icon=None,
-    bundle_identifier="org.convertisseur.markdownia",
+    bundle_identifier="io.github.zitdantes.markdownconverter",
     info_plist={
         "NSPrincipalClass": "NSApplication",
         "NSHighResolutionCapable": "True",

@@ -16,9 +16,9 @@ source .venv/bin/activate
 
 python3 -m pip install -q pyinstaller
 rm -rf build dist
-python3 -m PyInstaller --noconfirm ConvertisseurMarkdownIA.spec
+python3 -m PyInstaller --noconfirm MarkdownConverter.spec
 
-APP_NAME="Convertisseur Markdown IA.app"
+APP_NAME="Markdown Converter.app"
 if [[ ! -d "dist/${APP_NAME}" ]]; then
   echo "Erreur : dist/${APP_NAME} introuvable après PyInstaller." >&2
   exit 1
@@ -31,7 +31,7 @@ cp -R "dist/${APP_NAME}" "$STAGE/"
 cp docs/LISEZMOI_COLLEGUES.txt "$STAGE/LISEZMOI.txt"
 
 VERSION="$(date +%Y%m%d-%H%M)"
-ZIP_NAME="ConvertisseurMarkdownIA-mac-${VERSION}.zip"
+ZIP_NAME="MarkdownConverter-mac-${VERSION}.zip"
 ( cd "$STAGE" && zip -rq "$ROOT/$ZIP_NAME" . )
 
 echo "OK — archive prête pour distribution :"

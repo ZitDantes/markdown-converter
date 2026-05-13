@@ -27,7 +27,7 @@ def _isolated_log_dir(tmp_path_factory, monkeypatch):
     - redirige ``CONVERTISSEUR_LOG_DIR`` vers un dossier jetable ;
     - réinitialise le flag idempotent de ``logging_setup`` pour repartir
       d'un logger propre à chaque test ;
-    - appelle ``setup_logging()`` afin que le logger ``convertisseur`` ait
+    - appelle ``setup_logging()`` afin que le logger ``markdown_converter`` ait
       bien son niveau **INFO** (sinon les ``logger.info`` du métier sont
       filtrés et les callbacks UI ne reçoivent rien).
     """

@@ -1,4 +1,4 @@
-# Convertisseur Markdown IA (MVP)
+# Markdown Converter (MVP)
 
 [![CI](https://github.com/ZitDantes/markdown-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/ZitDantes/markdown-converter/actions/workflows/ci.yml)
 
@@ -128,8 +128,10 @@ L’application écrit un **fichier de log persistant** en plus du journal visib
 
 ### Où trouver le fichier de log
 
-- **macOS** : `~/Library/Logs/ConvertisseurMarkdownIA/run.log` (visible aussi dans **Console.app**, section *Fichiers journaux*).
-- **Autres systèmes** : `~/.convertisseur-markdown-ia/logs/run.log`.
+- **macOS** : `~/Library/Logs/MarkdownConverter/run.log` (visible aussi dans **Console.app**, section *Fichiers journaux*).
+- **Autres systèmes** : `~/.markdown-converter/logs/run.log`.
+
+**Mise à jour** : si vous utilisiez une version antérieure du produit, les journaux étaient dans `~/Library/Logs/ConvertisseurMarkdownIA/` (macOS) ou `~/.convertisseur-markdown-ia/logs/` (autres systèmes). Ces emplacements ne sont plus utilisés ; vous pouvez les examiner puis les supprimer manuellement si vous n’en avez plus besoin.
 
 Le chemin exact est affiché dans la première ligne du journal au démarrage de l’app.
 
@@ -142,7 +144,7 @@ Le fichier est limité à **~1 Mo** ; au-delà, il est archivé en `run.log.1`, 
 L’environnement `CONVERTISSEUR_LOG_DIR` permet de pointer vers un autre dossier, utile pour les tests ou un déploiement spécifique :
 
 ```bash
-export CONVERTISSEUR_LOG_DIR="$HOME/Desktop/logs-convertisseur"
+export CONVERTISSEUR_LOG_DIR="$HOME/Desktop/logs-markdown-converter"
 python3 main.py
 ```
 
@@ -203,13 +205,13 @@ Pour **contribuer au code** (correctifs, évolutions, documentation technique), 
 | `logging_setup.py` | Configuration centralisée du logging (fichier rotatif + callback UI). |
 | `errors.py` | Hiérarchie d’exceptions métier (`ConverterError` et descendants). |
 | `utils.py` | Extensions, chemins, nettoyage Markdown, avertissements par format. |
-| `ConvertisseurMarkdownIA.spec` | Définition PyInstaller (build `.app` reproductible). |
+| `MarkdownConverter.spec` | Définition PyInstaller (build `.app` reproductible). |
 | `scripts/build_mac_app.sh` | Script : PyInstaller + ZIP daté + LISEZMOI pour collègues. |
 | `docs/LISEZMOI_COLLEGUES.txt` | Texte d’accompagnement pour l’archive distribuée. |
 | `samples/` | Dossier local pour les documents de test (ignoré par git, voir [`samples/README.md`](samples/README.md)). |
 | `tests/` | Suite pytest (`unit/`, `integration/`, `fixtures/`, `conftest.py`). |
 
-L’API de `converter.py` (callbacks `on_log(level, message)` / `on_progress`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier. Le callback `on_log` est branché en interne sur le logger nommé `convertisseur` ; tout passe donc aussi par le fichier de log persistant (voir [Logs et diagnostic](#logs-et-diagnostic)).
+L’API de `converter.py` (callbacks `on_log(level, message)` / `on_progress`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier. Le callback `on_log` est branché en interne sur le logger nommé `markdown_converter` ; tout passe donc aussi par le fichier de log persistant (voir [Logs et diagnostic](#logs-et-diagnostic)).
 
 #### Ajouter un moteur de conversion
 
@@ -285,21 +287,21 @@ Les versions **Python 3.10, 3.11 et 3.12** sont testées sur **Ubuntu** (matrice
 
 ### Build PyInstaller (fichier `.spec` recommandé)
 
-Le fichier **[`ConvertisseurMarkdownIA.spec`](ConvertisseurMarkdownIA.spec)** est la référence de build (mode fenêtré, collecte complète de **markitdown**). Préférez-le aux commandes manuelles ci-dessous.
+Le fichier **[`MarkdownConverter.spec`](MarkdownConverter.spec)** est la référence de build (mode fenêtré, collecte complète de **markitdown**). Préférez-le aux commandes manuelles ci-dessous.
 
 ```bash
 cd markdown-converter   # racine du dépôt cloné (dossier contenant main.py)
 source .venv/bin/activate
 python3 -m pip install pyinstaller
-python3 -m PyInstaller --noconfirm ConvertisseurMarkdownIA.spec
+python3 -m PyInstaller --noconfirm MarkdownConverter.spec
 ```
 
-Le résultat se trouve dans **`dist/Convertisseur Markdown IA.app`**.
+Le résultat se trouve dans **`dist/Markdown Converter.app`**.
 
 **Alternative** en une ligne (équivalent approximatif sans fichier `.spec` dédié) :
 
 ```bash
-pyinstaller --windowed --name "Convertisseur Markdown IA" --collect-all markitdown main.py
+pyinstaller --windowed --name "Markdown Converter" --collect-all markitdown main.py
 ```
 
 ### Archive ZIP pour distribution (`build_mac_app.sh`)
@@ -310,11 +312,11 @@ Pour régénérer `dist/…` et créer une archive prête à envoyer (`.app` + `
 ./scripts/build_mac_app.sh
 ```
 
-Cela crée à la racine du projet une archive du type **`ConvertisseurMarkdownIA-mac-AAAAMMJJ-HHMM.zip`**.
+Cela crée à la racine du projet une archive du type **`MarkdownConverter-mac-AAAAMMJJ-HHMM.zip`**.
 
 ### Ce que font les utilisateurs du ZIP
 
-- Télécharger / récupérer le **ZIP**, le décompresser, glisser **« Convertisseur Markdown IA.app »** dans **Applications**.
+- Télécharger / récupérer le **ZIP**, le décompresser, glisser **« Markdown Converter.app »** dans **Applications**.
 - Au **premier lancement**, si macOS bloque l’app (développeur non identifié) : **clic droit → Ouvrir** sur l’icône, ou autoriser dans **Réglages système → Confidentialité et sécurité**. Sans **signature / notarisation Apple** (compte développeur payant), ce comportement est normal pour une app interne.
 - **Pandoc** n’est **pas** dans le bundle : le secours Pandoc ne fonctionne que si Pandoc est installé séparément sur leur Mac ; l’app fonctionne sans.
 

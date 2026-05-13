@@ -1,4 +1,4 @@
-# AGENTS.md — Convertisseur Markdown IA
+# AGENTS.md — Markdown Converter
 
 Ce fichier décrit comment les agents IA (Cursor, et tout autre outil compatible AGENTS.md) doivent collaborer sur ce projet. Il complète `README.md` (qui s'adresse aux humains).
 
@@ -51,7 +51,7 @@ Le repo GitHub a l'option **« Automatically delete head branches »** activée.
 - Dépendances déclarées dans `requirements.txt`. Toute nouvelle dépendance doit être justifiée dans le commit/PR.
 - Code et UI **en français** (interface, logs utilisateur, rapports).
 - Conserver l'API actuelle de `converter.py` (callbacks `on_log` / `on_progress`) pour permettre un futur swap d'UI.
-- Build macOS : `./scripts/build_mac_app.sh` ou directement via `ConvertisseurMarkdownIA.spec` (PyInstaller).
+- Build macOS : `./scripts/build_mac_app.sh` ou directement via `MarkdownConverter.spec` (PyInstaller).
 - **Ne jamais committer** : `.venv/`, `build/`, `dist/`, `__pycache__/`, archives `.zip`/`.dmg`, `.DS_Store`. Cf. `.gitignore`.
 - **Distribution binaire** : via GitHub Releases, pas dans le repo (la limite GitHub est 100 MB par fichier).
 
