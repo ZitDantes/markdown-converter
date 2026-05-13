@@ -40,6 +40,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
+      # Pandoc est le moteur de secours du projet : on l'installe en CI pour
+      # exécuter les tests d'intégration réels (tests/integration/test_pandoc_real.py).
+      # Sans cette étape, ces tests seraient automatiquement skip via skipif.
+      - name: Installer Pandoc
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pandoc
+
       - name: Ruff (lint)
         run: ruff check .
 
