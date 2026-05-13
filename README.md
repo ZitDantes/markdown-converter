@@ -167,6 +167,7 @@ Objectif : produire une **application autonome** (`.app`) pour des utilisateurs 
 | `ConvertisseurMarkdownIA.spec` | Définition PyInstaller (build `.app` reproductible). |
 | `scripts/build_mac_app.sh` | Script : PyInstaller + ZIP daté + LISEZMOI pour collègues. |
 | `docs/LISEZMOI_COLLEGUES.txt` | Texte d’accompagnement pour l’archive distribuée. |
+| `samples/` | Dossier local pour les documents de test (ignoré par git, voir [`samples/README.md`](samples/README.md)). |
 
 L’API de `converter.py` (callbacks `on_log` / `on_progress`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier.
 
