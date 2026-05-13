@@ -56,7 +56,14 @@ jobs:
       - name: Pytest
         run: pytest
 
-      # Installation des dépendances Qt isolée : peut échouer pour des raisons
+      # Bibliothèques système requises par PySide6/Qt6 sur Ubuntu, même en mode
+      # offscreen (Qt charge libEGL pour ses plugins de plateforme).
+      # `apt-get update` a déjà été fait à l'étape « Installer Pandoc ».
+      - name: Installer les libs système Qt (Ubuntu)
+        if: matrix.python-version == '3.12'
+        run: sudo apt-get install -y --no-install-recommends libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+
+      # Installation pip des dépendances Qt isolée : peut échouer pour des raisons
       # indépendantes du code (wheels manquants, miroir indisponible, etc.).
       # Si l'install échoue, le smoke suivant est sauté (cf. `if:`) et la CI
       # reste verte ; en revanche une régression du code Qt avec install OK
