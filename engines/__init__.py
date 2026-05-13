@@ -7,6 +7,7 @@ from engines.base import (
     EngineNotAvailableError,
 )
 from engines.markitdown_engine import MarkItDownEngine
+from engines.pandoc_engine import PandocEngine
 
 __all__ = [
     "ConverterEngine",
@@ -14,4 +15,5 @@ __all__ = [
     "EngineError",
     "EngineNotAvailableError",
     "MarkItDownEngine",
+    "PandocEngine",
 ]
