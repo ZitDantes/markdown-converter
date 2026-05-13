@@ -201,6 +201,7 @@ Objectif : produire une **application autonome** (`.app`) pour des utilisateurs 
 | `scripts/build_mac_app.sh` | Script : PyInstaller + ZIP daté + LISEZMOI pour collègues. |
 | `docs/LISEZMOI_COLLEGUES.txt` | Texte d’accompagnement pour l’archive distribuée. |
 | `samples/` | Dossier local pour les documents de test (ignoré par git, voir [`samples/README.md`](samples/README.md)). |
+| `tests/` | Suite pytest (`unit/`, `integration/`, `fixtures/`, `conftest.py`). |
 
 L’API de `converter.py` (callbacks `on_log(level, message)` / `on_progress`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier. Le callback `on_log` est branché en interne sur le logger nommé `convertisseur` ; tout passe donc aussi par le fichier de log persistant (voir [Logs et diagnostic](#logs-et-diagnostic)).
 
@@ -235,6 +236,29 @@ ruff format --check .   # vérifier le formatage sans modifier
 ```
 
 Toute modification doit garder `ruff check .` et `ruff format --check .` verts avant push.
+
+### Tests (pytest)
+
+Le projet utilise [pytest](https://docs.pytest.org/) (configuration dans [`pyproject.toml`](pyproject.toml), section `[tool.pytest.ini_options]`). La suite est organisée ainsi :
+
+| Dossier | Rôle |
+|---|---|
+| `tests/unit/` | Tests unitaires des fonctions pures (ex. `utils.py`). |
+| `tests/integration/` | Tests de bout en bout sur `converter.convert_files()` avec de petits fichiers réels. |
+| `tests/fixtures/` | Documents minimaux versionnés (sans donnée personnelle) utilisés par les tests. |
+| `tests/conftest.py` | Fixtures partagées : isolation du dossier de logs via `CONVERTISSEUR_LOG_DIR`, accès à `fixtures_dir`. |
+
+Lancement local :
+
+```bash
+source .venv/bin/activate
+python3 -m pip install -r requirements-dev.txt   # installe pytest si besoin
+pytest                                            # toute la suite
+pytest tests/unit                                 # uniquement les tests unitaires
+pytest -k normalize_extension                     # filtrer par nom de test
+```
+
+La suite doit rester verte avant tout push. Les tests **n'écrivent jamais** dans `~/Library/Logs/…` : la fixture `_isolated_log_dir` redirige les logs vers un dossier temporaire.
 
 ### Prérequis côté build
 

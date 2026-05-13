@@ -39,3 +39,22 @@ ignore = [
 quote-style = "double"
 indent-style = "space"
 docstring-code-format = false
+
+[tool.pytest.ini_options]
+# Découverte des tests : un seul dossier racine `tests/`.
+testpaths = ["tests"]
+
+# Le projet utilise un « flat layout » (modules à la racine du repo).
+# `pythonpath = ["."]` rend ces modules importables depuis les tests sans
+# avoir à packager l'application.
+pythonpath = ["."]
+
+# Conventions de nommage (par défaut pytest, explicitées pour la lisibilité).
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Options par défaut :
+#   -ra : résumé court de tous les non-passing (xfail, skip, fail, error).
+#   --strict-markers : empêche d'utiliser un marqueur inconnu sans définition.
+addopts = "-ra --strict-markers"
