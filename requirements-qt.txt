@@ -1,0 +1,8 @@
+# Dépendance optionnelle pour l'interface PySide6 (prototype, voir AGENTS.md / PLO-26).
+# Tkinter (ui.py) reste l'UI par défaut tant que MARKDOWN_CONVERTER_UI=qt n'est pas défini.
+#
+# Bornes choisies à PLO-34 :
+# - >=6.7 : QSplitter / QTableView / signaux modernes, support Python 3.10+ stable.
+# - <7.0  : préserve l'API courante de Qt 6 (Qt 7 n'existe pas encore).
+# Mettre à jour la borne haute avec une PR dédiée si nécessaire.
+PySide6>=6.7,<7.0
