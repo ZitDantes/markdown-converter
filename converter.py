@@ -50,10 +50,41 @@ logger = get_logger("converter")
 
 
 class ConversionStatus(str, Enum):
+    """
+    Statuts de fin pour un fichier source.
+
+    Trois variantes de succès sont distinguées pour l'UI et le rapport :
+
+    - ``SUCCESS`` : conversion OK, sans avertissement de format, via le moteur
+      primaire (MarkItDown aujourd'hui).
+    - ``SUCCESS_REVIEW`` : conversion OK mais le format demande une relecture
+      humaine (cf. ``utils.format_warning_for_extension``).
+    - ``SUCCESS_FALLBACK`` : conversion OK obtenue **uniquement** grâce au moteur
+      de secours (Pandoc) — le moteur primaire a échoué ou produit du vide.
+
+    **Règle de priorité** lorsque les deux conditions s'appliquent
+    (ex. PDF récupéré par Pandoc) : ``SUCCESS_REVIEW`` l'emporte sur
+    ``SUCCESS_FALLBACK``. L'information actionnable pour l'utilisateur
+    (« il faut relire ») prime sur l'information technique (« obtenu via
+    secours »). Le drapeau ``FileConversionRecord.used_pandoc_fallback`` reste
+    disponible pour qu'une UI affiche l'info technique en plus.
+    """
+
     SUCCESS = "success"
+    SUCCESS_REVIEW = "success_review"
+    SUCCESS_FALLBACK = "success_fallback"
     ERROR = "error"
     UNSUPPORTED = "unsupported"
     EMPTY = "empty"
+
+
+SUCCESS_STATUSES: frozenset[ConversionStatus] = frozenset(
+    {
+        ConversionStatus.SUCCESS,
+        ConversionStatus.SUCCESS_REVIEW,
+        ConversionStatus.SUCCESS_FALLBACK,
+    }
+)
 
 
 @dataclass
@@ -115,6 +146,23 @@ def _build_front_matter(
         lines.append(f"avertissement: {yaml_scalar_double_quoted(avertissement)}")
     lines.append("---")
     return "\n".join(lines) + "\n\n"
+
+
+def _resolve_success_status(
+    fmt_warning: str | None,
+    used_fallback: bool,
+) -> ConversionStatus:
+    """
+    Sélectionne le statut de succès fin selon le contexte.
+
+    Voir la docstring de ``ConversionStatus`` pour la règle de priorité
+    (``SUCCESS_REVIEW`` > ``SUCCESS_FALLBACK`` > ``SUCCESS``).
+    """
+    if fmt_warning:
+        return ConversionStatus.SUCCESS_REVIEW
+    if used_fallback:
+        return ConversionStatus.SUCCESS_FALLBACK
+    return ConversionStatus.SUCCESS
 
 
 def _convert_and_clean(engine: ConverterEngine, src: Path) -> str:
@@ -294,7 +342,7 @@ def _run_conversion(
             summary.records.append(
                 FileConversionRecord(
                     source_path=src,
-                    status=ConversionStatus.SUCCESS,
+                    status=_resolve_success_status(fmt_warning, used_fallback),
                     output_path=out_path,
                     used_pandoc_fallback=used_fallback,
                     engine_used=engine_used,
@@ -335,7 +383,7 @@ def _run_conversion(
                     summary.records.append(
                         FileConversionRecord(
                             source_path=src,
-                            status=ConversionStatus.SUCCESS,
+                            status=_resolve_success_status(fmt_warning, used_fallback=True),
                             output_path=out_path,
                             used_pandoc_fallback=True,
                             engine_used=fallback.name,
