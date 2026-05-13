@@ -22,6 +22,12 @@ from engines import (
     MarkItDownEngine,
     PandocEngine,
 )
+from errors import (
+    EmptyConversionError,
+    EngineFailureError,
+    OutputWriteError,
+    UnsupportedFormatError,
+)
 from utils import (
     SUPPORTED_EXTENSIONS,
     clean_markdown_body,
@@ -53,6 +59,9 @@ class FileConversionRecord:
     # Nom du moteur ayant produit le Markdown (None si aucun n'a réussi).
     # Plus évolutif que ``used_pandoc_fallback`` pour de futurs moteurs (OCR, etc.).
     engine_used: str | None = None
+    # Nom de la classe d'exception associée au statut non-SUCCESS (ex. "EngineFailureError",
+    # "OutputWriteError", "EmptyConversionError"). ``None`` pour un succès.
+    error_type: str | None = None
 
 
 @dataclass
@@ -117,6 +126,19 @@ def _try_fallback_convert(engine: ConverterEngine, src: Path, log: LogFn) -> str
     except EngineConversionError as e:
         log(f"{engine.name} (secours) n'a pas pu convertir « {src.name} » : {e}")
         return None
+
+
+def _write_markdown_output(out_path: Path, header: str, body: str) -> None:
+    """
+    Écrit ``header + body`` dans ``out_path``.
+
+    Lève ``OutputWriteError`` (avec ``OSError`` comme cause) si l'écriture échoue
+    pour une raison disque/permissions.
+    """
+    try:
+        out_path.write_text(header + body + "\n", encoding="utf-8")
+    except OSError as e:
+        raise OutputWriteError(f"Impossible d'écrire « {out_path.name} » : {e}") from e
 
 
 def convert_files(
@@ -191,6 +213,7 @@ def convert_files(
                     source_path=src,
                     status=ConversionStatus.UNSUPPORTED,
                     message="Extension non reconnue.",
+                    error_type=UnsupportedFormatError.__name__,
                 )
             )
             continue
@@ -221,6 +244,7 @@ def convert_files(
                         source_path=src,
                         status=ConversionStatus.EMPTY,
                         message=msg,
+                        error_type=EmptyConversionError.__name__,
                     )
                 )
                 summary.warnings.append(f"{src} : {msg}")
@@ -233,10 +257,8 @@ def convert_files(
                 date_conversion=date_str,
                 avertissement=fmt_warning,
             )
-            final_md = header + body + "\n"
-
             out_path = unique_output_md_path(output_dir, src.stem)
-            out_path.write_text(final_md, encoding="utf-8")
+            _write_markdown_output(out_path, header, body)
 
             summary.records.append(
                 FileConversionRecord(
@@ -250,8 +272,8 @@ def convert_files(
             how = f"{engine_used} (secours)" if used_fallback else engine_used
             log(f"OK — « {src.name} » → « {out_path.name} » ({how}).")
 
-        except Exception as e:  # noqa: BLE001
-            tb = traceback.format_exc()
+        except EngineConversionError as e:
+            # Le moteur primaire a échoué sur ce fichier ; on tente le fallback.
             human = f"{type(e).__name__} : {e}"
             log(f"Erreur pour « {src.name} » : {human}")
 
@@ -266,7 +288,20 @@ def convert_files(
                         avertissement=fmt_warning,
                     )
                     out_path = unique_output_md_path(output_dir, src.stem)
-                    out_path.write_text(header + fallback_body + "\n", encoding="utf-8")
+                    try:
+                        _write_markdown_output(out_path, header, fallback_body)
+                    except OutputWriteError as we:
+                        log(f"Erreur d'écriture pour « {src.name} » : {we}")
+                        summary.records.append(
+                            FileConversionRecord(
+                                source_path=src,
+                                status=ConversionStatus.ERROR,
+                                message=str(we),
+                                error_type=OutputWriteError.__name__,
+                            )
+                        )
+                        summary.warnings.append(f"{src} : {we}")
+                        continue
                     summary.records.append(
                         FileConversionRecord(
                             source_path=src,
@@ -283,11 +318,42 @@ def convert_files(
                     log(f"Récupéré par {fallback.name} — « {src.name} » → « {out_path.name} ».")
                     continue
 
+            # Tous les moteurs disponibles ont échoué.
             summary.records.append(
                 FileConversionRecord(
                     source_path=src,
                     status=ConversionStatus.ERROR,
                     message=human,
+                    error_type=EngineFailureError.__name__,
+                )
+            )
+            summary.warnings.append(f"{src} : {human}")
+
+        except OutputWriteError as we:
+            log(f"Erreur d'écriture pour « {src.name} » : {we}")
+            summary.records.append(
+                FileConversionRecord(
+                    source_path=src,
+                    status=ConversionStatus.ERROR,
+                    message=str(we),
+                    error_type=OutputWriteError.__name__,
+                )
+            )
+            summary.warnings.append(f"{src} : {we}")
+
+        except Exception as e:  # noqa: BLE001
+            # Garde-fou final : un bug imprévu (AttributeError, etc.) ne doit pas
+            # interrompre la conversion des autres fichiers du lot. La trace
+            # technique complète est conservée dans les warnings pour diagnostic.
+            tb = traceback.format_exc()
+            human = f"{type(e).__name__} : {e}"
+            log(f"Erreur inattendue pour « {src.name} » : {human}")
+            summary.records.append(
+                FileConversionRecord(
+                    source_path=src,
+                    status=ConversionStatus.ERROR,
+                    message=human,
+                    error_type=type(e).__name__,
                 )
             )
             summary.warnings.append(f"Trace technique pour « {src} » :\n```\n{tb}\n```")
