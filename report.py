@@ -19,7 +19,7 @@ def write_report(summary: ConversionSummary, report_path: Path | None = None) ->
 
     lines.append("# Rapport de conversion")
     lines.append("")
-    lines.append("Ce rapport a été généré automatiquement par **Convertisseur Markdown IA**.")
+    lines.append("Ce rapport a été généré automatiquement par **Markdown Converter**.")
     lines.append("")
     lines.append("## Résumé")
     lines.append("")

@@ -5,7 +5,7 @@ description: Effectue une review structurée d'une Pull Request GitHub alignée 
 
 # Code review d'une Pull Request
 
-Skill propre au projet **Convertisseur Markdown IA**. Aligné sur les règles d'[`AGENTS.md`](../../../AGENTS.md) : §2 (confirmations explicites pour les actions externes), §3 (boucle de travail standard), §5 (style commits et PR).
+Skill propre au projet **Markdown Converter**. Aligné sur les règles d'[`AGENTS.md`](../../../AGENTS.md) : §2 (confirmations explicites pour les actions externes), §3 (boucle de travail standard), §5 (style commits et PR).
 
 ## Quand l'utiliser
 

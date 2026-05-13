@@ -1,12 +1,12 @@
 """
-Configuration centralisée du logging pour le Convertisseur Markdown IA.
+Configuration centralisée du logging pour Markdown Converter.
 
 Politique :
 
-- Un seul logger nommé ``convertisseur`` (et ses enfants ``convertisseur.<module>``).
+- Un seul logger nommé ``markdown_converter`` (et ses enfants ``markdown_converter.<module>``).
 - Niveaux exposés à l'utilisateur : **INFO / WARNING / ERROR**.
 - Fichier de log persistant, par défaut macOS-natif
-  (``~/Library/Logs/ConvertisseurMarkdownIA/run.log``), avec rotation simple
+  (``~/Library/Logs/MarkdownConverter/run.log``), avec rotation simple
   via ``RotatingFileHandler`` (1 Mo, 5 backups).
 - Un ``CallbackHandler`` permet à l'UI (ou à un outil CLI) de recevoir chaque
   message sous la forme ``(level_name, formatted_message)`` pour le rendu
@@ -24,7 +24,7 @@ from collections.abc import Callable
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-LOGGER_NAME = "convertisseur"
+LOGGER_NAME = "markdown_converter"
 DEFAULT_MAX_BYTES = 1_000_000
 DEFAULT_BACKUP_COUNT = 5
 
@@ -35,9 +35,9 @@ def _default_log_dir() -> Path:
     """
     Emplacement standard du dossier de logs.
 
-    - macOS : ``~/Library/Logs/ConvertisseurMarkdownIA/`` (convention Apple,
+    - macOS : ``~/Library/Logs/MarkdownConverter/`` (convention Apple,
       visible dans Console.app).
-    - Autres plateformes : ``~/.convertisseur-markdown-ia/logs/`` (fallback).
+    - Autres plateformes : ``~/.markdown-converter/logs/`` (fallback).
 
     L'env var ``CONVERTISSEUR_LOG_DIR`` permet d'override (utile pour les tests
     et pour des cas particuliers de déploiement).
@@ -48,8 +48,8 @@ def _default_log_dir() -> Path:
 
     home = Path.home()
     if sys.platform == "darwin":
-        return home / "Library" / "Logs" / "ConvertisseurMarkdownIA"
-    return home / ".convertisseur-markdown-ia" / "logs"
+        return home / "Library" / "Logs" / "MarkdownConverter"
+    return home / ".markdown-converter" / "logs"
 
 
 def get_log_file_path() -> Path:
@@ -62,7 +62,7 @@ _already_configured = False
 
 def setup_logging(level: int = logging.INFO) -> Path:
     """
-    Initialise le logger global ``convertisseur`` et son ``RotatingFileHandler``.
+    Initialise le logger global ``markdown_converter`` et son ``RotatingFileHandler``.
 
     Idempotent : peut être appelé plusieurs fois (par ``main.py``, par les
     tests, etc.). Le file handler n'est attaché qu'une seule fois pour éviter
@@ -100,7 +100,7 @@ def setup_logging(level: int = logging.INFO) -> Path:
 
 def get_logger(module: str | None = None) -> logging.Logger:
     """
-    Retourne ``convertisseur`` (root applicatif) ou ``convertisseur.<module>``.
+    Retourne ``markdown_converter`` (root applicatif) ou ``markdown_converter.<module>``.
 
     À utiliser dans chaque module métier : ``logger = get_logger(__name__)``.
     """
@@ -134,7 +134,7 @@ class CallbackHandler(logging.Handler):
 
 def install_callback_handler(callback: LogCallback) -> CallbackHandler:
     """
-    Installe un ``CallbackHandler`` sur le logger ``convertisseur`` et le
+    Installe un ``CallbackHandler`` sur le logger ``markdown_converter`` et le
     renvoie pour permettre son retrait ultérieur (``remove_callback_handler``).
     """
     handler = CallbackHandler(callback)

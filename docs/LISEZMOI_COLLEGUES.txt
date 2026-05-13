@@ -1,29 +1,17 @@
-Convertisseur Markdown IA — installation rapide (macOS)
-======================================================
+Markdown Converter — installation rapide (macOS)
+==================================================
 
-Contenu de l’archive
---------------------
-- « Convertisseur Markdown IA.app » : l’application (double-clic pour lancer).
-- Ce fichier LISEZMOI (vous pouvez le supprimer après lecture).
+Contenu du ZIP :
 
-Installation
-------------
-1. Décompressez le fichier ZIP (double-clic).
-2. Glissez « Convertisseur Markdown IA.app » dans le dossier « Applications » de votre Mac (recommandé).
+- « Markdown Converter.app » : l’application (double-clic pour lancer).
+- LISEZMOI.txt : ce fichier (copie de la documentation courte).
 
-Premier lancement (Gatekeeper)
-------------------------------
-L’application n’est en général **pas signée** par Apple. Au premier lancement, macOS peut afficher un message du type « développeur non identifié ».
+Installation recommandée :
 
-- Faites un **clic droit** (ou Ctrl-clic) sur l’icône de l’app, puis choisissez **Ouvrir**, puis confirmez.
-- Ou : Réglages système → Confidentialité et sécurité → autoriser l’ouverture.
+1. Décompressez le ZIP.
+2. Glissez « Markdown Converter.app » dans le dossier « Applications » de votre Mac (recommandé).
+3. Au premier lancement, si macOS affiche un avertissement (développeur non identifié), faites un clic droit sur l’icône puis « Ouvrir », ou autorisez dans Réglages système → Confidentialité et sécurité.
 
-Aucune donnée n’est envoyée sur Internet : tout fonctionne en local.
+Pandoc n’est pas inclus dans l’application : le secours Pandoc ne fonctionne que si Pandoc est installé séparément sur votre Mac. L’application fonctionne sans.
 
-Pandoc (facultatif)
--------------------
-Le secours « Pandoc » n’est pas inclus dans l’application. Si votre service informatique l’autorise, vous pouvez installer Pandoc séparément (https://pandoc.org) ; ce n’est pas obligatoire pour utiliser l’outil.
-
-Support
--------
-En cas de problème, contactez la personne qui vous a transmis ce package.
+Pour toute question technique, consultez le dépôt GitHub du projet (README et issues).
