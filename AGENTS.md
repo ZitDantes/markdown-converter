@@ -37,6 +37,14 @@ Pour toute nouvelle tâche significative :
 5. **Review structurée** — avant le merge, lancer le skill [`code-review`](.cursor/skills/code-review/SKILL.md) qui restitue un verdict (bloquants / suggestions / points positifs) aligné sur les règles d'AGENTS.md. Le skill ne merge **jamais** automatiquement et ne fait **jamais** d'`approve` sur GitHub sans validation explicite ; il propose les actions à exécuter (`gh pr review --approve`, etc.) et attend un « ok ».
 6. **Mise à jour Linear** — proposer (jamais imposer) le passage du ticket en *In Progress* au début, *In Review* à l'ouverture de la PR, *Done* à la fusion.
 
+### Après le merge : nettoyage automatique
+
+Le repo GitHub a l'option **« Automatically delete head branches »** activée. Conséquences :
+
+- La branche distante (`origin/PLO-<n>-...`) est **supprimée automatiquement** dès qu'une PR est mergée. Aucun `git push origin --delete` à prévoir.
+- Côté local, l'agent (ou l'humain) fait simplement `git fetch --prune` pour aligner les refs `origin/*` avec la réalité du remote.
+- La branche **locale** mergée peut être supprimée avec `git branch -d PLO-<n>-...` (mode sécurisé qui refuse si elle n'est pas mergée).
+
 ## 4. Conventions techniques
 
 - **Python ≥ 3.10** (cf. `README.md` pour Tkinter et la version `python-tk@x.y` correspondante).
