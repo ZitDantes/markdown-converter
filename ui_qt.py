@@ -475,12 +475,22 @@ def run_app() -> None:
 
     Conçu pour être appelé depuis ``main.py`` à la place de ``ui.run_app``
     quand ``MARKDOWN_CONVERTER_UI=qt``.
+
+    Important : on garde une référence locale forte à ``qt_app``. PySide6
+    connecte les bound methods via une **référence faible** ; sans cette
+    variable, le GC peut libérer l'instance dès la sortie de cette fonction
+    locale et invalider silencieusement les slots (boutons qui ne réagissent
+    plus, etc.). Conserver ``qt_app`` jusqu'à la fin de ``app.exec()``
+    garantit que les slots restent appelables.
     """
     import sys
 
     from PySide6.QtWidgets import QApplication
 
     app = QApplication.instance() or QApplication(sys.argv)
-    window = MarkdownConverterQtApp().build()
+    qt_app = MarkdownConverterQtApp()
+    window = qt_app.build()
     window.show()
-    sys.exit(app.exec())
+    exit_code = app.exec()
+    del qt_app  # explicite : la référence ne sert plus une fois exec() rendu
+    sys.exit(exit_code)
