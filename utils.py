@@ -1,13 +1,13 @@
 """
 Utilitaires : extensions supportées, collecte de fichiers, nettoyage Markdown,
-chemins de sortie uniques, détection de Pandoc.
+chemins de sortie uniques et avertissements par format.
+
+Les helpers spécifiques à Pandoc ont été déplacés dans ``engines/pandoc_engine.py``.
 """
 
 from __future__ import annotations
 
 import re
-import shutil
-import subprocess
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -27,11 +27,6 @@ def normalize_extension(path: Path) -> str:
 
 def is_supported_path(path: Path) -> bool:
     return path.is_file() and normalize_extension(path) in SUPPORTED_EXTENSIONS
-
-
-def find_pandoc() -> str | None:
-    """Chemin vers l'exécutable ``pandoc`` si présent sur le système."""
-    return shutil.which("pandoc")
 
 
 def collect_supported_files_under_directory(root: Path) -> list[Path]:
@@ -166,49 +161,3 @@ def yaml_scalar_double_quoted(value: str) -> str:
         value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
     )
     return f'"{escaped}"'
-
-
-def run_pandoc_to_markdown(
-    pandoc_exe: str,
-    input_path: Path,
-    from_format: str,
-) -> str:
-    """
-    Exécute Pandoc et retourne le Markdown UTF-8.
-
-    Lève ``RuntimeError`` en cas d'échec.
-    """
-    cmd = [
-        pandoc_exe,
-        f"--from={from_format}",
-        "--to=gfm",
-        "--standalone",
-        str(input_path),
-    ]
-    proc = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    if proc.returncode != 0:
-        err = (proc.stderr or proc.stdout or "").strip()
-        raise RuntimeError(err or f"Pandoc a échoué (code {proc.returncode}).")
-    return proc.stdout
-
-
-def pandoc_from_format_for_extension(ext: str) -> str | None:
-    """
-    Nom du lecteur Pandoc ``--from=`` pour l'extension donnée, ou ``None`` si non géré.
-    """
-    ext = ext.lower()
-    mapping: dict[str, str] = {
-        ".docx": "docx",
-        ".pptx": "pptx",
-        ".pdf": "pdf",
-        ".html": "html",
-        ".htm": "html",
-        ".txt": "plain",
-    }
-    return mapping.get(ext)
