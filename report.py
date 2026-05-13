@@ -70,6 +70,8 @@ def write_report(summary: ConversionSummary, report_path: Path | None = None) ->
     else:
         for r in errors:
             lines.append(f"- `{r.source_path}`")
+            if r.error_type:
+                lines.append(f"  - **Type d'erreur** : `{r.error_type}`")
             lines.append(f"  - {r.message or 'Erreur inconnue.'}")
     lines.append("")
 
@@ -79,7 +81,8 @@ def write_report(summary: ConversionSummary, report_path: Path | None = None) ->
         lines.append("_Aucun._")
     else:
         for r in empty:
-            lines.append(f"- `{r.source_path}` : {r.message or 'Contenu vide.'}")
+            type_note = f" (type : `{r.error_type}`)" if r.error_type else ""
+            lines.append(f"- `{r.source_path}`{type_note} : {r.message or 'Contenu vide.'}")
     lines.append("")
 
     lines.append("## Formats non supportés (ignorés)")

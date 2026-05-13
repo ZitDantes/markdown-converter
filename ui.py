@@ -176,7 +176,11 @@ class ConvertisseurApp(tk.Tk):
                 self._log_async(f"Rapport enregistré : {report_path}")
                 self.after(0, lambda: self._conversion_finished(True, None))
             except Exception as e:  # noqa: BLE001
-                err = str(e)
+                # Garde-fou du thread worker : tout doit être attrapé sinon le thread
+                # meurt silencieusement et l'UI reste figée. On préfixe le message
+                # par le type d'exception (ex. « EngineNotAvailableError : … »)
+                # pour faciliter le diagnostic côté utilisateur.
+                err = f"{type(e).__name__} : {e}"
                 self.after(0, lambda err=err: self._conversion_finished(False, err))
 
         threading.Thread(target=worker, daemon=True).start()
