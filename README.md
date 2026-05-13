@@ -1,5 +1,7 @@
 # Convertisseur Markdown IA (MVP)
 
+[![CI](https://github.com/ZitDantes/markdown-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/ZitDantes/markdown-converter/actions/workflows/ci.yml)
+
 > **Licence en cours de définition** — Ce dépôt est public sur GitHub, mais **aucune licence open source n’a encore été formalisée** (pas de fichier `LICENSE` à la racine). Tant que ce n’est pas le cas, le code reste par défaut **« tous droits réservés »** (*All rights reserved*) du point de vue du droit d’auteur : toute réutilisation ou redistribution nécessite une autorisation explicite des mainteneurs.
 
 Application **macOS** (Python 3) pour convertir en lot des documents bureautiques en fichiers **Markdown** (UTF-8), en vue d’alimenter une base de connaissances ou un système RAG. **Tout est local** : aucune donnée n’est envoyée vers un service cloud.
@@ -259,6 +261,18 @@ pytest -k normalize_extension                     # filtrer par nom de test
 ```
 
 La suite doit rester verte avant tout push. Les tests **n'écrivent jamais** dans `~/Library/Logs/…` : la fixture `_isolated_log_dir` redirige les logs vers un dossier temporaire.
+
+### Intégration continue (GitHub Actions)
+
+Sur chaque **pull request** et sur chaque **push** vers `main`, le workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) exécute automatiquement :
+
+- **ruff check** (lint) ;
+- **ruff format --check** (formatage, sans modifier les fichiers) ;
+- **pytest** (toute la suite).
+
+Les versions **Python 3.10, 3.11 et 3.12** sont testées sur **Ubuntu** (matrice). Le badge CI en tête de ce fichier renvoie vers la dernière exécution sur la branche par défaut.
+
+> **Note** : une ancienne version du backlog mentionnait *black* ; le projet utilise uniquement **ruff** pour le lint et le format (cf. section [Lint et formatage (ruff)](#lint-et-formatage-ruff)).
 
 ### Prérequis côté build
 
