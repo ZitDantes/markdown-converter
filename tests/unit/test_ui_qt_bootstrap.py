@@ -115,3 +115,33 @@ def test_add_paths_to_model_filters_and_dedupes(qt_app: object, tmp_path: object
     again = add_paths_to_model(model, [supported])
     assert again == []
     assert len(model.records()) == 1
+
+
+def test_convert_button_disabled_until_files_and_output(qt_app: object, tmp_path: object) -> None:
+    from ui_qt import MarkdownConverterQtApp, add_paths_to_model
+
+    app = MarkdownConverterQtApp()
+    app.build()
+    assert app.footer_parts is not None
+    assert app.file_view_parts is not None
+
+    assert app.footer_parts.convert_button.isEnabled() is False
+
+    src = tmp_path / "doc.docx"
+    src.write_bytes(b"x")
+    add_paths_to_model(app.file_view_parts.model, [src])
+    assert app.footer_parts.convert_button.isEnabled() is False
+
+    app.set_output_dir(tmp_path / "out")
+    assert app.footer_parts.convert_button.isEnabled() is True
+
+
+def test_set_output_dir_updates_banner(qt_app: object, tmp_path: object) -> None:
+    from ui_qt import MarkdownConverterQtApp
+
+    app = MarkdownConverterQtApp()
+    app.build()
+    target = tmp_path / "out"
+    app.set_output_dir(target)
+    assert app.output_banner_parts is not None
+    assert str(target.resolve()) in app.output_banner_parts.label.text()

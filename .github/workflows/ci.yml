@@ -79,4 +79,19 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          python -c "import sys; from PySide6.QtWidgets import QApplication; from ui_qt import MarkdownConverterQtApp; app = QApplication(sys.argv); a = MarkdownConverterQtApp(); a.build(); assert a.zones is not None and a.zones.journal.isVisible() is False; print('UI Qt offscreen OK, journal caché:', a.zones.titlebar.objectName())"
+          python - <<'PY'
+          import sys
+          from PySide6.QtWidgets import QApplication
+          from ui_qt import MarkdownConverterQtApp
+
+          app = QApplication(sys.argv)
+          a = MarkdownConverterQtApp()
+          a.build()
+          assert a.zones is not None and a.zones.journal.isVisible() is False
+          assert a.file_view_parts is not None
+          assert a.file_view_parts.model.columnCount() == 5
+          assert a.output_banner_parts is not None
+          assert a.footer_parts is not None
+          assert a.footer_parts.convert_button.isEnabled() is False
+          print("UI Qt offscreen OK :", a.zones.titlebar.objectName())
+          PY
