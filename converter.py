@@ -110,6 +110,11 @@ class FileConversionRecord:
     # Progression du fichier courant dans ``[0.0, 1.0]`` (1.0 = étape terminée).
     # Mis à jour pendant la boucle de conversion pour les UIs type barre par ligne.
     progress_percent: float = 0.0
+    # Corps Markdown produit (front-matter compris), rempli uniquement quand
+    # ``convert_files(..., keep_output_in_memory=True)`` ET que l'écriture sur disque
+    # a réussi. Sinon ``None`` pour ne pas charger la RAM sur de gros lots. Pratique
+    # pour un onglet « Aperçu » côté UI sans relire le fichier produit.
+    output_md_text: str | None = None
 
 
 @dataclass
@@ -234,17 +239,23 @@ def _try_fallback_convert(engine: ConverterEngine, src: Path) -> str | None:
         return None
 
 
-def _write_markdown_output(out_path: Path, header: str, body: str) -> None:
+def _write_markdown_output(out_path: Path, header: str, body: str) -> str:
     """
-    Écrit ``header + body`` dans ``out_path``.
+    Écrit ``header + body + "\n"`` dans ``out_path`` et retourne le contenu écrit.
+
+    Le retour est l'image fidèle de ce qui se trouve sur disque (front-matter
+    + corps + saut de ligne final), pratique pour le remettre ensuite dans
+    ``FileConversionRecord.output_md_text`` sans relire le fichier.
 
     Lève ``OutputWriteError`` (avec ``OSError`` comme cause) si l'écriture échoue
     pour une raison disque/permissions.
     """
+    content = header + body + "\n"
     try:
-        out_path.write_text(header + body + "\n", encoding="utf-8")
+        out_path.write_text(content, encoding="utf-8")
     except OSError as e:
         raise OutputWriteError(f"Impossible d'écrire « {out_path.name} » : {e}") from e
+    return content
 
 
 def convert_files(
@@ -253,6 +264,8 @@ def convert_files(
     output_dir: Path,
     on_log: LogFn | None = None,
     on_progress: ProgressFn | None = None,
+    *,
+    keep_output_in_memory: bool = False,
 ) -> ConversionSummary:
     """
     Convertit une liste de fichiers et/ou l'arborescence de dossiers vers ``output_dir``.
@@ -266,6 +279,13 @@ def convert_files(
     (``0.0``-``1.0``) est la part **globale** du lot ; il est omis pour les
     callbacks existants à trois arguments (rétrocompatibilité).
 
+    ``keep_output_in_memory`` (par défaut ``False``) : si ``True``, le Markdown
+    produit (front-matter inclus) est conservé dans
+    ``FileConversionRecord.output_md_text`` après écriture réussie, pour
+    permettre à une UI d'afficher un aperçu sans relire le disque. À utiliser
+    avec précaution sur de gros lots (consommation mémoire ∝ taille du lot).
+    Sinon le champ reste ``None``.
+
     Tous les messages sont également écrits dans le fichier de log persistant
     configuré par ``logging_setup.setup_logging()``.
     """
@@ -277,7 +297,14 @@ def convert_files(
     )
 
     try:
-        return _run_conversion(explicit_files, directory_roots, output_dir, prog, started)
+        return _run_conversion(
+            explicit_files,
+            directory_roots,
+            output_dir,
+            prog,
+            started,
+            keep_output_in_memory=keep_output_in_memory,
+        )
     finally:
         if callback_handler is not None:
             remove_callback_handler(callback_handler)
@@ -289,6 +316,8 @@ def _run_conversion(
     output_dir: Path,
     prog: Callable[[int, int, str, float], None],
     started: datetime,
+    *,
+    keep_output_in_memory: bool,
 ) -> ConversionSummary:
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -421,13 +450,15 @@ def _run_conversion(
             )
             out_path = unique_output_md_path(output_dir, src.stem)
             tick(0.85)
-            _write_markdown_output(out_path, header, body)
+            written = _write_markdown_output(out_path, header, body)
 
             rec.status = _resolve_success_status(fmt_warning, used_fallback)
             rec.output_path = out_path
             rec.used_pandoc_fallback = used_fallback
             rec.engine_used = engine_used
             rec.progress_percent = 1.0
+            if keep_output_in_memory:
+                rec.output_md_text = written
             how = f"{engine_used} (secours)" if used_fallback else engine_used
             logger.info("OK — « %s » → « %s » (%s).", src.name, out_path.name, how)
 
@@ -448,7 +479,7 @@ def _run_conversion(
                     out_path = unique_output_md_path(output_dir, src.stem)
                     try:
                         tick(0.75)
-                        _write_markdown_output(out_path, header, fallback_body)
+                        written = _write_markdown_output(out_path, header, fallback_body)
                     except OutputWriteError as we:
                         logger.error("Erreur d'écriture pour « %s » : %s", src.name, we)
                         rec.status = ConversionStatus.ERROR
@@ -467,6 +498,8 @@ def _run_conversion(
                         f"Conversion réussie via {fallback.name} après échec de {primary.name}."
                     )
                     rec.progress_percent = 1.0
+                    if keep_output_in_memory:
+                        rec.output_md_text = written
                     logger.info(
                         "Récupéré par %s — « %s » → « %s ».",
                         fallback.name,

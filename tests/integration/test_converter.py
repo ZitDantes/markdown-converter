@@ -16,6 +16,62 @@ import pytest
 from converter import ConversionStatus, convert_files
 
 
+def test_output_md_text_none_by_default(tmp_path: Path, fixtures_dir: Path) -> None:
+    """Par défaut (``keep_output_in_memory=False``), aucun corps n'est conservé en RAM."""
+    src = tmp_path / "simple.txt"
+    shutil.copy(fixtures_dir / "simple.txt", src)
+    output_dir = tmp_path / "out"
+
+    summary = convert_files(
+        explicit_files=[src],
+        directory_roots=[],
+        output_dir=output_dir,
+    )
+
+    record = summary.records[0]
+    assert record.output_md_text is None
+    assert record.output_path is not None and record.output_path.exists()
+
+
+def test_output_md_text_captured_when_option_enabled(
+    tmp_path: Path,
+    fixtures_dir: Path,
+) -> None:
+    """Avec ``keep_output_in_memory=True``, le record contient exactement le contenu écrit."""
+    src = tmp_path / "simple.txt"
+    shutil.copy(fixtures_dir / "simple.txt", src)
+    output_dir = tmp_path / "out"
+
+    summary = convert_files(
+        explicit_files=[src],
+        directory_roots=[],
+        output_dir=output_dir,
+        keep_output_in_memory=True,
+    )
+
+    record = summary.records[0]
+    assert record.output_path is not None
+    assert record.output_md_text is not None
+    assert record.output_md_text.startswith("---")
+    assert record.output_md_text == record.output_path.read_text(encoding="utf-8")
+
+
+def test_output_md_text_only_for_successful_records(tmp_path: Path) -> None:
+    """Les records non-SUCCESS (ici UNSUPPORTED) n'ont jamais d'``output_md_text``."""
+    bad = tmp_path / "data.xyz"
+    bad.write_text("contenu", encoding="utf-8")
+    output_dir = tmp_path / "out"
+
+    summary = convert_files(
+        explicit_files=[bad],
+        directory_roots=[],
+        output_dir=output_dir,
+        keep_output_in_memory=True,
+    )
+
+    assert all(r.output_md_text is None for r in summary.records)
+
+
 def test_on_progress_percent_monotonic_and_records_finished(
     tmp_path: Path,
     fixtures_dir: Path,
