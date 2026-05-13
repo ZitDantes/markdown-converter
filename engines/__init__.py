@@ -6,10 +6,12 @@ from engines.base import (
     EngineError,
     EngineNotAvailableError,
 )
+from engines.markitdown_engine import MarkItDownEngine
 
 __all__ = [
     "ConverterEngine",
     "EngineConversionError",
     "EngineError",
     "EngineNotAvailableError",
+    "MarkItDownEngine",
 ]
