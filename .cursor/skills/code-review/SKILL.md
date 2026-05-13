@@ -13,6 +13,16 @@ Skill propre au projet **Convertisseur Markdown IA**. Aligné sur les règles d'
 - L'agent vient d'ouvrir une PR via `gh pr create` et il est pertinent de la relire avant de la transmettre à l'humain.
 - L'utilisateur dit « valide cette PR » ou « passe la PR en review ».
 
+## Canaux de review possibles
+
+Deux canaux peuvent recevoir la review, à choisir selon le contexte :
+
+1. **GitHub direct** via `gh pr review <num> --comment|--approve|--request-changes` — toujours disponible. Demander à l'utilisateur quel canal il préfère si non précisé.
+
+2. **Linear Diffs** (si activé sur le workspace, cf. [Linear docs Diffs](https://linear.app/docs/diffs)) — l'utilisateur peut ouvrir le PR dans Linear et faire la review depuis là. Les commentaires et le statut de review se synchronisent automatiquement avec GitHub. **Bonus** : la review apparaît directement à côté du ticket `PLO-<n>` correspondant.
+
+L'agent ne sait pas distinguer si Linear Diffs est activé. **Restitue toujours la review en chat** (format imposé à l'étape 7 ci-dessous), puis **propose** l'action GitHub correspondante. Si l'utilisateur préfère faire la review depuis Linear, il copie/colle simplement la restitution dans le panneau Linear Diffs.
+
 ## Règles d'or (AGENTS.md §2)
 
 1. **Jamais de merge automatique**, même si la review est positive.
