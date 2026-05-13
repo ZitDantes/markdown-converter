@@ -9,6 +9,7 @@ Application **macOS** (Python 3) pour convertir en lot des documents bureautique
 ## Table des matières
 
 - [Pour les utilisateurs](#pour-les-utilisateurs)
+  - [Télécharger la dernière version](#telecharger-la-derniere-version)
 - [Logs et diagnostic](#logs-et-diagnostic)
 - [Qualité, limites et bonnes pratiques](#qualite-limites-et-bonnes-pratiques)
 - [Pour les développeurs et la distribution (macOS)](#pour-les-developpeurs-et-la-distribution-macos)
@@ -18,6 +19,16 @@ Application **macOS** (Python 3) pour convertir en lot des documents bureautique
 ---
 
 ## Pour les utilisateurs
+
+### Télécharger la dernière version
+
+L’option **la plus simple** pour utiliser l’application sans rien installer côté développement : récupérer le bundle `.app` packagé depuis la page **[Releases](https://github.com/ZitDantes/markdown-converter/releases/latest)** du dépôt.
+
+1. Télécharger l’archive `MarkdownConverter-mac-vX.Y.Z.zip` attachée à la dernière release.
+2. La décompresser, puis glisser **« Markdown Converter.app »** dans le dossier **Applications**.
+3. Voir [Ce que font les utilisateurs du ZIP](#ce-que-font-les-utilisateurs-du-zip) pour les détails du premier lancement (autorisation Gatekeeper).
+
+Pour suivre le détail des changements entre versions : voir [`CHANGELOG.md`](CHANGELOG.md). Pour exécuter l’application depuis les sources (développeurs ou contributeurs), suivez plutôt les sections ci-dessous.
 
 ### Prérequis
 
@@ -309,10 +320,11 @@ pyinstaller --windowed --name "Markdown Converter" --collect-all markitdown main
 Pour régénérer `dist/…` et créer une archive prête à envoyer (`.app` + `LISEZMOI.txt` dérivé de [`docs/LISEZMOI_COLLEGUES.txt`](docs/LISEZMOI_COLLEGUES.txt)) :
 
 ```bash
-./scripts/build_mac_app.sh
+./scripts/build_mac_app.sh              # archive horodatée (build interne)
+./scripts/build_mac_app.sh v0.1.0       # archive nommée pour une release GitHub
 ```
 
-Cela crée à la racine du projet une archive du type **`MarkdownConverter-mac-AAAAMMJJ-HHMM.zip`**.
+Sans argument, l’archive porte un nom du type **`MarkdownConverter-mac-AAAAMMJJ-HHMM.zip`**. Avec un argument de version (ex. `v0.1.0`), elle s’appelle **`MarkdownConverter-mac-v0.1.0.zip`**, prête à être attachée à une [GitHub Release](https://github.com/ZitDantes/markdown-converter/releases).
 
 ### Ce que font les utilisateurs du ZIP
 

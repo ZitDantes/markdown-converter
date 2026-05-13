@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Construit l’application macOS (.app) avec PyInstaller et produit une archive ZIP datée
-# pour distribution aux collègues (inclut un LISEZMOI).
+# Construit l’application macOS (.app) avec PyInstaller et produit une archive ZIP
+# pour distribution (inclut un LISEZMOI).
+#
+# Usage :
+#   ./scripts/build_mac_app.sh              # archive horodatée (build interne, partage rapide)
+#   ./scripts/build_mac_app.sh v0.1.0       # archive nommée pour une GitHub Release
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,7 +34,7 @@ trap 'rm -rf "$STAGE"' EXIT
 cp -R "dist/${APP_NAME}" "$STAGE/"
 cp docs/LISEZMOI_COLLEGUES.txt "$STAGE/LISEZMOI.txt"
 
-VERSION="$(date +%Y%m%d-%H%M)"
+VERSION="${1:-$(date +%Y%m%d-%H%M)}"
 ZIP_NAME="MarkdownConverter-mac-${VERSION}.zip"
 ( cd "$STAGE" && zip -rq "$ROOT/$ZIP_NAME" . )
 
