@@ -28,6 +28,7 @@ suivants de les remplir sans toucher au layout global.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -40,17 +41,39 @@ DEFAULT_HEIGHT = 720
 INSPECTOR_INITIAL_WIDTH = 380
 
 
+@dataclass
+class QtZones:
+    """Conteneur typé des zones de la fenêtre principale.
+
+    Préférable à des attributs dynamiques sur ``QMainWindow`` : Pyright / Pylance
+    voient les champs, et les sous-tickets PLO-35..PLO-39 ont une cible claire à
+    remplir (``app.zones.toolbar_area``, ``app.zones.file_view``…).
+    """
+
+    titlebar: QWidget
+    toolbar_area: QWidget
+    output_banner: QWidget
+    file_view: QWidget
+    inspector: QWidget
+    footer: QWidget
+    journal: QWidget
+
+
 class MarkdownConverterQtApp:
     """Squelette de la fenêtre principale PySide6.
 
     Cette classe ne hérite **pas** de ``QMainWindow`` ; elle l'agrège. Cela
     permet de l'instancier dans un contexte sans ``QApplication`` actif
     (ex. tests d'import) en différant la construction Qt à ``build()``.
+
+    Une fois ``build()`` appelé, les widgets clés sont accessibles via
+    ``self.zones`` (cf. :class:`QtZones`).
     """
 
     def __init__(self) -> None:
         self._window: QMainWindow | None = None
         self._central_splitter: QSplitter | None = None
+        self.zones: QtZones | None = None
 
     def build(self) -> QMainWindow:
         """Construit et retourne la ``QMainWindow``. Ne l'affiche pas."""
@@ -100,14 +123,15 @@ class MarkdownConverterQtApp:
 
         window.setCentralWidget(root)
 
-        window._titlebar = titlebar
-        window._toolbar_area = toolbar_area
-        window._output_banner = output_banner
-        window._file_view = file_view
-        window._inspector = inspector
-        window._footer = footer
-        window._journal = journal
-
+        self.zones = QtZones(
+            titlebar=titlebar,
+            toolbar_area=toolbar_area,
+            output_banner=output_banner,
+            file_view=file_view,
+            inspector=inspector,
+            footer=footer,
+            journal=journal,
+        )
         self._window = window
         self._central_splitter = central
         return window
