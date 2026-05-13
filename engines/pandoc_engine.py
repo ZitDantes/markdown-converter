@@ -8,6 +8,7 @@ vide. Il dépend d'un exécutable ``pandoc`` présent dans le ``PATH`` ; sans ce
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -28,10 +29,32 @@ _PANDOC_FORMAT_MAP: dict[str, str] = {
     ".txt": "plain",
 }
 
+# Timeout par défaut d'un appel à ``pandoc``. Évite qu'un fichier corrompu fige
+# la conversion du lot indéfiniment. Surchargeable via l'env ``PANDOC_TIMEOUT_S``.
+DEFAULT_PANDOC_TIMEOUT_S: int = 60
+
 
 def _find_pandoc() -> str | None:
     """Chemin vers l'exécutable ``pandoc`` si présent sur le système."""
     return shutil.which("pandoc")
+
+
+def _resolve_timeout_s() -> int:
+    """
+    Timeout effectif pour les appels Pandoc, en secondes.
+
+    Lit la variable d'environnement ``PANDOC_TIMEOUT_S`` si elle est définie et valide ;
+    retombe sinon sur :data:`DEFAULT_PANDOC_TIMEOUT_S`. Les valeurs non numériques ou
+    ``<= 0`` sont ignorées (fallback silencieux sur la valeur par défaut).
+    """
+    raw = os.environ.get("PANDOC_TIMEOUT_S")
+    if raw is None:
+        return DEFAULT_PANDOC_TIMEOUT_S
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_PANDOC_TIMEOUT_S
+    return value if value > 0 else DEFAULT_PANDOC_TIMEOUT_S
 
 
 class PandocEngine(ConverterEngine):
@@ -76,14 +99,21 @@ class PandocEngine(ConverterEngine):
             "--standalone",
             str(path),
         ]
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
+        timeout_s = _resolve_timeout_s()
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=timeout_s,
+            )
+        except subprocess.TimeoutExpired as e:
+            raise EngineConversionError(
+                f"Pandoc a dépassé le délai de {timeout_s} s sur « {path.name} »."
+            ) from e
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "").strip()
             raise EngineConversionError(err or f"Pandoc a échoué (code {proc.returncode}).")
