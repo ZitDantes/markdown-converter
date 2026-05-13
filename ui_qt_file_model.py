@@ -82,6 +82,7 @@ def _status_label_fr(status: ConversionStatus) -> str:
         ConversionStatus.UNSUPPORTED: "Non pris en charge",
         ConversionStatus.EMPTY: "Vide",
         ConversionStatus.PROCESSING: "En cours",
+        ConversionStatus.QUEUED: "En attente",
     }
     return mapping.get(status, status.value)
 
