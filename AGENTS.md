@@ -34,7 +34,8 @@ Pour toute nouvelle tâche significative :
    ```
    L'ID Linear en préfixe active l'**auto-link** Linear ↔ GitHub.
 4. **Pull Request** — titre `PLO-<n> — <description>`, description contenant `Closes PLO-<n>` pour fermer automatiquement le ticket au merge.
-5. **Mise à jour Linear** — proposer (jamais imposer) le passage du ticket en *In Progress* au début, *In Review* à l'ouverture de la PR, *Done* à la fusion.
+5. **Review structurée** — avant le merge, lancer le skill [`code-review`](.cursor/skills/code-review/SKILL.md) qui restitue un verdict (bloquants / suggestions / points positifs) aligné sur les règles d'AGENTS.md. Le skill ne merge **jamais** automatiquement et ne fait **jamais** d'`approve` sur GitHub sans validation explicite ; il propose les actions à exécuter (`gh pr review --approve`, etc.) et attend un « ok ».
+6. **Mise à jour Linear** — proposer (jamais imposer) le passage du ticket en *In Progress* au début, *In Review* à l'ouverture de la PR, *Done* à la fusion.
 
 ## 4. Conventions techniques
 
