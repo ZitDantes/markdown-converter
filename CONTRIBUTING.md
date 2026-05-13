@@ -88,10 +88,17 @@ Après merge, si l’option GitHub **« Automatically delete head branches »** 
 
 ---
 
+## Licence
+
+Le dépôt est sous **licence MIT** ([`LICENSE`](LICENSE)). En contribuant du code que vous acceptez de voir fusionné dans ce projet, vous acceptez en général que votre contribution soit sous la même licence (convention habituelle sur GitHub ; en cas de doute juridique, contactez les mainteneurs).
+
+---
+
 ## Résumé des liens utiles
 
 | Sujet | Fichier |
 |---|---|
+| Licence (MIT) | [LICENSE](LICENSE) |
 | Installation et usage | [README.md](README.md) |
 | Workflow Linear, agents, règles d’orchestration | [AGENTS.md](AGENTS.md) |
 | CI (ruff + pytest) | [.github/workflows/ci.yml](.github/workflows/ci.yml) |
