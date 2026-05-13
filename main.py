@@ -65,6 +65,12 @@ def main() -> None:
         import tkinter  # noqa: F401
     except ImportError as e:
         _fail_tkinter(e)
+
+    from logging_setup import get_logger, setup_logging
+
+    log_path = setup_logging()
+    get_logger("main").info("Démarrage de l'application (logs : %s).", log_path)
+
     from ui import run_app
 
     run_app()

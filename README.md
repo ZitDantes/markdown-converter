@@ -7,6 +7,7 @@ Application **macOS** (Python 3) pour convertir en lot des documents bureautique
 ## Table des matières
 
 - [Pour les utilisateurs](#pour-les-utilisateurs)
+- [Logs et diagnostic](#logs-et-diagnostic)
 - [Qualité, limites et bonnes pratiques](#qualite-limites-et-bonnes-pratiques)
 - [Pour les développeurs et la distribution (macOS)](#pour-les-developpeurs-et-la-distribution-macos)
 - [Licence](#licence)
@@ -118,6 +119,36 @@ Les textes de l’interface et du rapport sont en **français**.
 
 ---
 
+## Logs et diagnostic
+
+L’application écrit un **fichier de log persistant** en plus du journal visible dans la fenêtre. Trois niveaux sont utilisés : **INFO** (information), **WARNING** (avertissement, conversion à surveiller) et **ERROR** (échec, fichier non produit).
+
+### Où trouver le fichier de log
+
+- **macOS** : `~/Library/Logs/ConvertisseurMarkdownIA/run.log` (visible aussi dans **Console.app**, section *Fichiers journaux*).
+- **Autres systèmes** : `~/.convertisseur-markdown-ia/logs/run.log`.
+
+Le chemin exact est affiché dans la première ligne du journal au démarrage de l’app.
+
+### Rotation
+
+Le fichier est limité à **~1 Mo** ; au-delà, il est archivé en `run.log.1`, `run.log.2`, etc. (5 backups). Aucune action n’est requise.
+
+### Surcharger l’emplacement (cas avancé)
+
+L’environnement `CONVERTISSEUR_LOG_DIR` permet de pointer vers un autre dossier, utile pour les tests ou un déploiement spécifique :
+
+```bash
+export CONVERTISSEUR_LOG_DIR="$HOME/Desktop/logs-convertisseur"
+python3 main.py
+```
+
+### En cas de problème
+
+Joignez **`run.log`** (et les `.1`, `.2`… si l’erreur est ancienne) à votre demande de support : ils contiennent les horodatages, niveaux et messages techniques nécessaires au diagnostic.
+
+---
+
 ## Qualité, limites et bonnes pratiques
 
 ### Limites connues
@@ -163,13 +194,15 @@ Objectif : produire une **application autonome** (`.app`) pour des utilisateurs 
 | `engines/markitdown_engine.py` | Moteur principal **MarkItDown** (import paresseux). |
 | `engines/pandoc_engine.py` | Moteur de secours **Pandoc** (binaire externe). |
 | `report.py` | Génération de `rapport_conversion.md`. |
+| `logging_setup.py` | Configuration centralisée du logging (fichier rotatif + callback UI). |
+| `errors.py` | Hiérarchie d’exceptions métier (`ConverterError` et descendants). |
 | `utils.py` | Extensions, chemins, nettoyage Markdown, avertissements par format. |
 | `ConvertisseurMarkdownIA.spec` | Définition PyInstaller (build `.app` reproductible). |
 | `scripts/build_mac_app.sh` | Script : PyInstaller + ZIP daté + LISEZMOI pour collègues. |
 | `docs/LISEZMOI_COLLEGUES.txt` | Texte d’accompagnement pour l’archive distribuée. |
 | `samples/` | Dossier local pour les documents de test (ignoré par git, voir [`samples/README.md`](samples/README.md)). |
 
-L’API de `converter.py` (callbacks `on_log` / `on_progress`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier.
+L’API de `converter.py` (callbacks `on_log(level, message)` / `on_progress`) est pensée pour pouvoir brancher une autre interface (par ex. PySide6) plus tard sans réécrire la logique métier. Le callback `on_log` est branché en interne sur le logger nommé `convertisseur` ; tout passe donc aussi par le fichier de log persistant (voir [Logs et diagnostic](#logs-et-diagnostic)).
 
 #### Ajouter un moteur de conversion
 

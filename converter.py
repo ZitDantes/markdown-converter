@@ -28,6 +28,13 @@ from errors import (
     OutputWriteError,
     UnsupportedFormatError,
 )
+from logging_setup import (
+    CallbackHandler,
+    LogCallback,
+    get_logger,
+    install_callback_handler,
+    remove_callback_handler,
+)
 from utils import (
     SUPPORTED_EXTENSIONS,
     clean_markdown_body,
@@ -38,6 +45,8 @@ from utils import (
     unique_output_md_path,
     yaml_scalar_double_quoted,
 )
+
+logger = get_logger("converter")
 
 
 class ConversionStatus(str, Enum):
@@ -77,7 +86,7 @@ class ConversionSummary:
     pandoc_available: bool = False
 
 
-LogFn = Callable[[str], None]
+LogFn = LogCallback  # rétro-compat : type alias public exporté par converter.py
 ProgressFn = Callable[[int, int, str], None]
 
 
@@ -113,18 +122,18 @@ def _convert_and_clean(engine: ConverterEngine, src: Path) -> str:
     return clean_markdown_body(engine.convert(src))
 
 
-def _try_fallback_convert(engine: ConverterEngine, src: Path, log: LogFn) -> str | None:
+def _try_fallback_convert(engine: ConverterEngine, src: Path) -> str | None:
     """
     Tente une conversion via ``engine`` (utilisé en secours).
 
     Renvoie le Markdown nettoyé, ou ``None`` si le moteur a levé une
-    ``EngineConversionError`` (l'erreur est alors loggée). Les autres exceptions
-    sont laissées remonter à l'orchestrateur.
+    ``EngineConversionError`` (l'erreur est alors loggée en WARNING). Les
+    autres exceptions sont laissées remonter à l'orchestrateur.
     """
     try:
         return _convert_and_clean(engine, src)
     except EngineConversionError as e:
-        log(f"{engine.name} (secours) n'a pas pu convertir « {src.name} » : {e}")
+        logger.warning("%s (secours) n'a pas pu convertir « %s » : %s", engine.name, src.name, e)
         return None
 
 
@@ -151,18 +160,39 @@ def convert_files(
     """
     Convertit une liste de fichiers et/ou l'arborescence de dossiers vers ``output_dir``.
 
-    ``on_log`` reçoit des messages en français ; ``on_progress(index, total, label)``.
+    ``on_log(level, message)`` reçoit le niveau (``"INFO"`` / ``"WARNING"`` /
+    ``"ERROR"``) et le message en français ; ``on_progress(index, total, label)``.
+
+    Tous les messages sont également écrits dans le fichier de log persistant
+    configuré par ``logging_setup.setup_logging()``.
     """
     started = datetime.now()
-    log = on_log or (lambda _m: None)
     prog = on_progress or (lambda _i, _t, _l: None)
 
+    callback_handler: CallbackHandler | None = (
+        install_callback_handler(on_log) if on_log is not None else None
+    )
+
+    try:
+        return _run_conversion(explicit_files, directory_roots, output_dir, prog, started)
+    finally:
+        if callback_handler is not None:
+            remove_callback_handler(callback_handler)
+
+
+def _run_conversion(
+    explicit_files: list[Path],
+    directory_roots: list[Path],
+    output_dir: Path,
+    prog: ProgressFn,
+    started: datetime,
+) -> ConversionSummary:
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     pandoc_ok = PandocEngine.is_available()
     if not pandoc_ok:
-        log(
+        logger.info(
             "Note : Pandoc n'est pas installé ou absent du PATH. "
             "La conversion utilise **uniquement MarkItDown**, ce qui est le fonctionnement "
             "normal du programme. Pandoc est **optionnel** : il sert de secours si un fichier "
@@ -170,9 +200,10 @@ def convert_files(
             "ou voir https://pandoc.org/installing.html ."
         )
     else:
-        log(
-            f"Pandoc est disponible ({PandocEngine.executable_path()}) ; "
-            "il ne sera utilisé qu'en secours si MarkItDown échoue ou renvoie un contenu vide."
+        logger.info(
+            "Pandoc est disponible (%s) ; "
+            "il ne sera utilisé qu'en secours si MarkItDown échoue ou renvoie un contenu vide.",
+            PandocEngine.executable_path(),
         )
 
     supported, unsupported = merge_file_lists(explicit_files, directory_roots)
@@ -187,12 +218,12 @@ def convert_files(
     for p in unsupported:
         ext = normalize_extension(p)
         msg = f"Ignoré (format non supporté « {ext or '(sans extension)'} ») : {p}"
-        log(msg)
+        logger.warning(msg)
         summary.warnings.append(msg)
 
     total = len(supported)
     if total == 0:
-        log(
+        logger.warning(
             "Aucun fichier à convertir : ajoutez des fichiers ou un dossier "
             "contenant des formats supportés."
         )
@@ -227,7 +258,7 @@ def convert_files(
             engine_used: str | None = primary.name
 
             if is_effectively_empty_markdown(body) and fallback is not None:
-                fallback_body = _try_fallback_convert(fallback, src, log)
+                fallback_body = _try_fallback_convert(fallback, src)
                 if fallback_body is not None:
                     body = fallback_body
                     used_fallback = True
@@ -238,7 +269,7 @@ def convert_files(
                     "Le document converti est vide après nettoyage. "
                     "Le fichier Markdown n'a pas été créé pour éviter un fichier vide."
                 )
-                log(f"Échec pour « {src.name} » : {msg}")
+                logger.error("Échec pour « %s » : %s", src.name, msg)
                 summary.records.append(
                     FileConversionRecord(
                         source_path=src,
@@ -270,15 +301,14 @@ def convert_files(
                 )
             )
             how = f"{engine_used} (secours)" if used_fallback else engine_used
-            log(f"OK — « {src.name} » → « {out_path.name} » ({how}).")
+            logger.info("OK — « %s » → « %s » (%s).", src.name, out_path.name, how)
 
         except EngineConversionError as e:
-            # Le moteur primaire a échoué sur ce fichier ; on tente le fallback.
             human = f"{type(e).__name__} : {e}"
-            log(f"Erreur pour « {src.name} » : {human}")
+            logger.warning("Erreur moteur pour « %s » : %s", src.name, human)
 
             if fallback is not None:
-                fallback_body = _try_fallback_convert(fallback, src, log)
+                fallback_body = _try_fallback_convert(fallback, src)
                 if fallback_body is not None and not is_effectively_empty_markdown(fallback_body):
                     titre = _infer_title_from_body(src.stem, fallback_body)
                     header = _build_front_matter(
@@ -291,7 +321,7 @@ def convert_files(
                     try:
                         _write_markdown_output(out_path, header, fallback_body)
                     except OutputWriteError as we:
-                        log(f"Erreur d'écriture pour « {src.name} » : {we}")
+                        logger.error("Erreur d'écriture pour « %s » : %s", src.name, we)
                         summary.records.append(
                             FileConversionRecord(
                                 source_path=src,
@@ -315,10 +345,15 @@ def convert_files(
                             ),
                         )
                     )
-                    log(f"Récupéré par {fallback.name} — « {src.name} » → « {out_path.name} ».")
+                    logger.info(
+                        "Récupéré par %s — « %s » → « %s ».",
+                        fallback.name,
+                        src.name,
+                        out_path.name,
+                    )
                     continue
 
-            # Tous les moteurs disponibles ont échoué.
+            logger.error("Échec total pour « %s » : %s", src.name, human)
             summary.records.append(
                 FileConversionRecord(
                     source_path=src,
@@ -330,7 +365,7 @@ def convert_files(
             summary.warnings.append(f"{src} : {human}")
 
         except OutputWriteError as we:
-            log(f"Erreur d'écriture pour « {src.name} » : {we}")
+            logger.error("Erreur d'écriture pour « %s » : %s", src.name, we)
             summary.records.append(
                 FileConversionRecord(
                     source_path=src,
@@ -342,12 +377,9 @@ def convert_files(
             summary.warnings.append(f"{src} : {we}")
 
         except Exception as e:  # noqa: BLE001
-            # Garde-fou final : un bug imprévu (AttributeError, etc.) ne doit pas
-            # interrompre la conversion des autres fichiers du lot. La trace
-            # technique complète est conservée dans les warnings pour diagnostic.
             tb = traceback.format_exc()
             human = f"{type(e).__name__} : {e}"
-            log(f"Erreur inattendue pour « {src.name} » : {human}")
+            logger.error("Erreur inattendue pour « %s » : %s", src.name, human)
             summary.records.append(
                 FileConversionRecord(
                     source_path=src,
