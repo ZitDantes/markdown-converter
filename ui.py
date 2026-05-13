@@ -185,7 +185,7 @@ class MarkdownConverterApp(tk.Tk):
                     directory_roots=list(self._directory_roots),
                     output_dir=self._output_dir,  # type: ignore[arg-type]
                     on_log=self._log_async,
-                    on_progress=lambda i, t, lab: self.after(
+                    on_progress=lambda i, t, lab, *_: self.after(
                         0,
                         lambda i=i, t=t, lab=lab: self._update_progress(i, t, lab),
                     ),

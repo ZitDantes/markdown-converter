@@ -9,6 +9,7 @@ par fichier et la construction du front-matter Markdown.
 
 from __future__ import annotations
 
+import inspect
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -76,6 +77,10 @@ class ConversionStatus(str, Enum):
     ERROR = "error"
     UNSUPPORTED = "unsupported"
     EMPTY = "empty"
+    # Transitoire : un fichier est en cours de traitement dans ``convert_files``.
+    # Ne doit pas figurer dans un résumé final (toujours remplacé par un statut
+    # terminal avant de passer au fichier suivant).
+    PROCESSING = "processing"
 
 
 SUCCESS_STATUSES: frozenset[ConversionStatus] = frozenset(
@@ -102,6 +107,9 @@ class FileConversionRecord:
     # Nom de la classe d'exception associée au statut non-SUCCESS (ex. "EngineFailureError",
     # "OutputWriteError", "EmptyConversionError"). ``None`` pour un succès.
     error_type: str | None = None
+    # Progression du fichier courant dans ``[0.0, 1.0]`` (1.0 = étape terminée).
+    # Mis à jour pendant la boucle de conversion pour les UIs type barre par ligne.
+    progress_percent: float = 0.0
 
 
 @dataclass
@@ -118,7 +126,48 @@ class ConversionSummary:
 
 
 LogFn = LogCallback  # rétro-compat : type alias public exporté par converter.py
-ProgressFn = Callable[[int, int, str], None]
+# ``index`` / ``total`` / ``label`` : inchangés par rapport à l'API historique.
+# ``percent`` (0.0-1.0) : avancement **global du lot** ; absent pour les callbacks à trois arguments.
+ProgressFn = Callable[..., None]
+
+
+def _batch_percent_0_1(idx: int, total: int, file_progress: float) -> float:
+    """
+    Part du lot dans ``[0.0, 1.0]``.
+
+    ``idx`` : indice 1-based du fichier dans le lot, ``file_progress`` : fraction
+    ``[0, 1]`` pour le fichier courant (0 = début, 1 = terminé).
+    """
+    if total <= 0:
+        return 1.0
+    return min(1.0, max(0.0, (idx - 1 + file_progress) / total))
+
+
+def _wrap_progress_callback(
+    on_progress: ProgressFn | None,
+) -> Callable[[int, int, str, float], None]:
+    """Adapte les callbacks ``(i, t, l)`` (historique) et ``(i, t, l, p)`` (enrichi)."""
+
+    if on_progress is None:
+        return lambda *_a, **_k: None
+
+    def wrapped(index: int, total: int, label: str, percent: float) -> None:
+        sig = inspect.signature(on_progress)
+        params = [
+            p
+            for p in sig.parameters.values()
+            if p.kind
+            in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            )
+        ]
+        if len(params) >= 4:
+            on_progress(index, total, label, percent)  # type: ignore[misc]
+        else:
+            on_progress(index, total, label)  # type: ignore[misc]
+
+    return wrapped
 
 
 def _infer_title_from_body(stem: str, body: str) -> str:
@@ -209,13 +258,19 @@ def convert_files(
     Convertit une liste de fichiers et/ou l'arborescence de dossiers vers ``output_dir``.
 
     ``on_log(level, message)`` reçoit le niveau (``"INFO"`` / ``"WARNING"`` /
-    ``"ERROR"``) et le message en français ; ``on_progress(index, total, label)``.
+    ``"ERROR"``) et le message en français.
+
+    ``on_progress(index, total, label, percent=...)`` : ``index`` et ``total``
+    suivent la convention historique (``index`` vaut ``idx - 1`` au début du
+    fichier ``idx``, puis ``idx`` une fois le fichier terminé). ``percent``
+    (``0.0``-``1.0``) est la part **globale** du lot ; il est omis pour les
+    callbacks existants à trois arguments (rétrocompatibilité).
 
     Tous les messages sont également écrits dans le fichier de log persistant
     configuré par ``logging_setup.setup_logging()``.
     """
     started = datetime.now()
-    prog = on_progress or (lambda _i, _t, _l: None)
+    prog = _wrap_progress_callback(on_progress)
 
     callback_handler: CallbackHandler | None = (
         install_callback_handler(on_log) if on_log is not None else None
@@ -232,7 +287,7 @@ def _run_conversion(
     explicit_files: list[Path],
     directory_roots: list[Path],
     output_dir: Path,
-    prog: ProgressFn,
+    prog: Callable[[int, int, str, float], None],
     started: datetime,
 ) -> ConversionSummary:
     output_dir = output_dir.resolve()
@@ -284,8 +339,9 @@ def _run_conversion(
 
     for idx, src in enumerate(supported, start=1):
         label = src.name
-        prog(idx - 1, total, label)
         ext = normalize_extension(src)
+        progress_closed = False
+
         if ext not in SUPPORTED_EXTENSIONS:
             summary.records.append(
                 FileConversionRecord(
@@ -293,15 +349,42 @@ def _run_conversion(
                     status=ConversionStatus.UNSUPPORTED,
                     message="Extension non reconnue.",
                     error_type=UnsupportedFormatError.__name__,
+                    progress_percent=1.0,
                 )
             )
+            prog(idx - 1, total, label, _batch_percent_0_1(idx, total, 0.0))
+            prog(idx, total, label, _batch_percent_0_1(idx, total, 1.0))
+            progress_closed = True
             continue
+
+        rec = FileConversionRecord(
+            source_path=src,
+            status=ConversionStatus.PROCESSING,
+            progress_percent=0.0,
+        )
+        summary.records.append(rec)
+        prog(idx - 1, total, label, _batch_percent_0_1(idx, total, 0.0))
 
         fmt_warning = format_warning_for_extension(ext)
         date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        def _make_tick(
+            r: FileConversionRecord,
+            i: int,
+            tot: int,
+            lab: str,
+        ) -> Callable[[float], None]:
+            def inner(file_part: float) -> None:
+                r.progress_percent = file_part
+                prog(i - 1, tot, lab, _batch_percent_0_1(i, tot, file_part))
+
+            return inner
+
+        tick = _make_tick(rec, idx, total, label)
+
         try:
             body = _convert_and_clean(primary, src)
+            tick(0.2)
             used_fallback = False
             engine_used: str | None = primary.name
 
@@ -312,21 +395,21 @@ def _run_conversion(
                     used_fallback = True
                     engine_used = fallback.name
 
+            tick(0.55)
+
             if is_effectively_empty_markdown(body):
                 msg = (
                     "Le document converti est vide après nettoyage. "
                     "Le fichier Markdown n'a pas été créé pour éviter un fichier vide."
                 )
                 logger.error("Échec pour « %s » : %s", src.name, msg)
-                summary.records.append(
-                    FileConversionRecord(
-                        source_path=src,
-                        status=ConversionStatus.EMPTY,
-                        message=msg,
-                        error_type=EmptyConversionError.__name__,
-                    )
-                )
+                rec.status = ConversionStatus.EMPTY
+                rec.message = msg
+                rec.error_type = EmptyConversionError.__name__
+                rec.progress_percent = 1.0
                 summary.warnings.append(f"{src} : {msg}")
+                prog(idx, total, label, _batch_percent_0_1(idx, total, 1.0))
+                progress_closed = True
                 continue
 
             titre = _infer_title_from_body(src.stem, body)
@@ -337,17 +420,14 @@ def _run_conversion(
                 avertissement=fmt_warning,
             )
             out_path = unique_output_md_path(output_dir, src.stem)
+            tick(0.85)
             _write_markdown_output(out_path, header, body)
 
-            summary.records.append(
-                FileConversionRecord(
-                    source_path=src,
-                    status=_resolve_success_status(fmt_warning, used_fallback),
-                    output_path=out_path,
-                    used_pandoc_fallback=used_fallback,
-                    engine_used=engine_used,
-                )
-            )
+            rec.status = _resolve_success_status(fmt_warning, used_fallback)
+            rec.output_path = out_path
+            rec.used_pandoc_fallback = used_fallback
+            rec.engine_used = engine_used
+            rec.progress_percent = 1.0
             how = f"{engine_used} (secours)" if used_fallback else engine_used
             logger.info("OK — « %s » → « %s » (%s).", src.name, out_path.name, how)
 
@@ -367,78 +447,63 @@ def _run_conversion(
                     )
                     out_path = unique_output_md_path(output_dir, src.stem)
                     try:
+                        tick(0.75)
                         _write_markdown_output(out_path, header, fallback_body)
                     except OutputWriteError as we:
                         logger.error("Erreur d'écriture pour « %s » : %s", src.name, we)
-                        summary.records.append(
-                            FileConversionRecord(
-                                source_path=src,
-                                status=ConversionStatus.ERROR,
-                                message=str(we),
-                                error_type=OutputWriteError.__name__,
-                            )
-                        )
+                        rec.status = ConversionStatus.ERROR
+                        rec.message = str(we)
+                        rec.error_type = OutputWriteError.__name__
+                        rec.progress_percent = 1.0
                         summary.warnings.append(f"{src} : {we}")
+                        prog(idx, total, label, _batch_percent_0_1(idx, total, 1.0))
+                        progress_closed = True
                         continue
-                    summary.records.append(
-                        FileConversionRecord(
-                            source_path=src,
-                            status=_resolve_success_status(fmt_warning, used_fallback=True),
-                            output_path=out_path,
-                            used_pandoc_fallback=True,
-                            engine_used=fallback.name,
-                            message=(
-                                f"Conversion réussie via {fallback.name} "
-                                f"après échec de {primary.name}."
-                            ),
-                        )
+                    rec.status = _resolve_success_status(fmt_warning, used_fallback=True)
+                    rec.output_path = out_path
+                    rec.used_pandoc_fallback = True
+                    rec.engine_used = fallback.name
+                    rec.message = (
+                        f"Conversion réussie via {fallback.name} après échec de {primary.name}."
                     )
+                    rec.progress_percent = 1.0
                     logger.info(
                         "Récupéré par %s — « %s » → « %s ».",
                         fallback.name,
                         src.name,
                         out_path.name,
                     )
+                    prog(idx, total, label, _batch_percent_0_1(idx, total, 1.0))
+                    progress_closed = True
                     continue
 
             logger.error("Échec total pour « %s » : %s", src.name, human)
-            summary.records.append(
-                FileConversionRecord(
-                    source_path=src,
-                    status=ConversionStatus.ERROR,
-                    message=human,
-                    error_type=EngineFailureError.__name__,
-                )
-            )
+            rec.status = ConversionStatus.ERROR
+            rec.message = human
+            rec.error_type = EngineFailureError.__name__
+            rec.progress_percent = 1.0
             summary.warnings.append(f"{src} : {human}")
 
         except OutputWriteError as we:
             logger.error("Erreur d'écriture pour « %s » : %s", src.name, we)
-            summary.records.append(
-                FileConversionRecord(
-                    source_path=src,
-                    status=ConversionStatus.ERROR,
-                    message=str(we),
-                    error_type=OutputWriteError.__name__,
-                )
-            )
+            rec.status = ConversionStatus.ERROR
+            rec.message = str(we)
+            rec.error_type = OutputWriteError.__name__
+            rec.progress_percent = 1.0
             summary.warnings.append(f"{src} : {we}")
 
         except Exception as e:  # noqa: BLE001
             tb = traceback.format_exc()
             human = f"{type(e).__name__} : {e}"
             logger.error("Erreur inattendue pour « %s » : %s", src.name, human)
-            summary.records.append(
-                FileConversionRecord(
-                    source_path=src,
-                    status=ConversionStatus.ERROR,
-                    message=human,
-                    error_type=type(e).__name__,
-                )
-            )
+            rec.status = ConversionStatus.ERROR
+            rec.message = human
+            rec.error_type = type(e).__name__
+            rec.progress_percent = 1.0
             summary.warnings.append(f"Trace technique pour « {src} » :\n```\n{tb}\n```")
 
-        prog(idx, total, label)
+        if not progress_closed:
+            prog(idx, total, label, _batch_percent_0_1(idx, total, 1.0))
 
     summary.finished_at = datetime.now()
     return summary
