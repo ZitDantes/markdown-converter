@@ -12,6 +12,7 @@ Application **macOS** (Python 3) pour convertir en lot des documents bureautique
 - [Logs et diagnostic](#logs-et-diagnostic)
 - [Qualité, limites et bonnes pratiques](#qualite-limites-et-bonnes-pratiques)
 - [Pour les développeurs et la distribution (macOS)](#pour-les-developpeurs-et-la-distribution-macos)
+- [Contribuer au projet](CONTRIBUTING.md)
 - [Licence](#licence)
 
 ---
@@ -184,10 +185,13 @@ Joignez **`run.log`** (et les `.1`, `.2`… si l’erreur est ancienne) à votre
 
 Objectif : produire une **application autonome** (`.app`) pour des utilisateurs qui **n’installent pas** Python ni de venv.
 
+Pour **contribuer au code** (correctifs, évolutions, documentation technique), suivez le guide **[CONTRIBUTING.md](CONTRIBUTING.md)** (setup, lint, tests, commits, PR, dépendances).
+
 ### Structure du projet
 
 | Fichier ou dossier | Rôle |
 |--------------------|------|
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Guide de contribution (humains) : setup, lint, tests, PR, dépendances. |
 | `main.py` | Lancement de l’application. |
 | `ui.py` | Interface Tkinter (français). |
 | `converter.py` | Orchestration du lot (boucle, statut par fichier, rapport). |
