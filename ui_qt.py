@@ -8,7 +8,8 @@ squelette ; PLO-35 a livré la file et le worker ; PLO-36 garnit la **toolbar**
 ainsi que le bouton **Vider** sur la file. PLO-37 livre le **journal** bas
 (filtres niveau, lien vers ``run.log``). PLO-39 enrichit le **footer** (progress
 globale, compteurs, ETA, rapport) et la **titlebar** (pastille Pandoc, embase
-thème sans logique). Le rendu reste volontairement sobre (mockup fonctionnel) ;
+thème sans logique). PLO-27 ajoute le **glisser-déposer** natif sur la file
+(overlay pointillé). Le rendu reste volontairement sobre (mockup fonctionnel) ;
 le polish visuel arrive avec PLO-28 et les tickets suivants.
 
 Architecture cible (cf. ``design_handoff_ui_refonte/README.md``) ::
@@ -738,6 +739,7 @@ def _build_file_view() -> tuple[QWidget, FileViewParts]:
         QVBoxLayout,
     )
 
+    from ui_qt_file_drop_table import ConversionFileDropTableView
     from ui_qt_file_model import ConversionFileTableModel
     from ui_qt_file_proxy import ConversionFileFilterProxy
 
@@ -768,7 +770,7 @@ def _build_file_view() -> tuple[QWidget, FileViewParts]:
 
     model = ConversionFileTableModel()
     proxy = ConversionFileFilterProxy(model)
-    table = QTableView(frame)
+    table = ConversionFileDropTableView(model, frame)
     table.setObjectName("file_view_table")
     table.setModel(proxy)
     table.setSortingEnabled(True)
