@@ -42,6 +42,8 @@ Au tout début de chaque **nouvelle** session, **avant toute autre action**, l'a
 
 **Portée temporelle** : ce rituel s'applique **uniquement** au **premier** message d'une **nouvelle** session. L'agent **ne le répète pas** sur les messages suivants de la même session (y compris après reprise de contexte ou changement de sujet dans le fil).
 
+Si aucun ticket Linear n'est mentionné dans les **deux premiers échanges** d'une session, l'agent propose automatiquement d'aller chercher les issues ouvertes du projet via le **MCP Linear** avant de continuer.
+
 > **Note** : la lecture du statut CI et l'interrogation Linear peuvent nécessiter des appels réseau/outils ; ils restent dans le cadre des actions **autorisées sans confirmation** décrites en §2 pour l'exploration et les vérifications locales.
 
 Pour toute nouvelle tâche significative :
@@ -149,6 +151,8 @@ Et il attend un **« ok »** explicite avant d'appeler `save_issue`.
 - Ne jamais committer de secrets, tokens, ou chemins absolus contenant des données personnelles.
 
 ## 10. Évolution du workflow — penser aux hooks Cursor
+
+Un hook `sessionStart` injecte automatiquement l'état du projet (branche, dernier commit, CI via `gh`, `ruff`, fichiers non commités) en **contexte système** à chaque nouvelle session Composer (voir `.cursor/hooks.json` et `.cursor/hooks/session-init.sh`).
 
 > **Rappel à se faire de temps en temps** (tous les 2-3 mois ou à chaque palier projet) : passer en revue les frictions répétitives de la session pour évaluer si un **hook Cursor** (`.cursor/hooks.json`) permettrait de les automatiser et de muscler le workflow.
 
