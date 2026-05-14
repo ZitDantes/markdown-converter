@@ -152,7 +152,7 @@ Et il attend un **« ok »** explicite avant d'appeler `save_issue`.
 
 ## 10. Évolution du workflow — penser aux hooks Cursor
 
-Un hook `sessionStart` injecte automatiquement l'état du projet (branche, dernier commit, CI via `gh`, `ruff`, fichiers non commités) en **contexte système** à chaque nouvelle session Composer (voir `.cursor/hooks.json` et `.cursor/hooks/session-init.sh`).
+Un hook `sessionStart` injecte automatiquement l'état du projet (branche, dernier commit, CI via `gh`, `ruff`, fichiers non commités) et un **rappel d'utiliser le MCP Linear** (issues ouvertes, équipe `PLO`) lorsque le ticket n'est pas déjà explicite — le tout en **contexte système** à chaque nouvelle session Composer (voir `.cursor/hooks.json` et `.cursor/hooks/session-init.sh`).
 
 > **Rappel à se faire de temps en temps** (tous les 2-3 mois ou à chaque palier projet) : passer en revue les frictions répétitives de la session pour évaluer si un **hook Cursor** (`.cursor/hooks.json`) permettrait de les automatiser et de muscler le workflow.
 

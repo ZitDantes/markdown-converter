@@ -140,12 +140,15 @@ else
   LINE_WT="Fichiers : ${nlines} entrée(s) modifiée(s) / non suivie(s) (git status --short)."
 fi
 
+LINE_LINEAR="Linear : si aucun ticket PLO n'est déjà clair, interroger le MCP Linear (issues ouvertes du projet, équipe PLO) avant de poursuivre."
+
 LINE_Q="Sur quoi travaille-t-on maintenant ?"
 
 export HOOK_LINE_GIT="$LINE_GIT"
 export HOOK_LINE_CI="$LINE_CI"
 export HOOK_LINE_RUFF="$LINE_RUFF"
 export HOOK_LINE_WT="$LINE_WT"
+export HOOK_LINE_LINEAR="$LINE_LINEAR"
 export HOOK_LINE_Q="$LINE_Q"
 
 python3 -c "
@@ -155,6 +158,7 @@ ctx = '\n'.join([
     os.environ.get('HOOK_LINE_CI', ''),
     os.environ.get('HOOK_LINE_RUFF', ''),
     os.environ.get('HOOK_LINE_WT', ''),
+    os.environ.get('HOOK_LINE_LINEAR', ''),
     os.environ.get('HOOK_LINE_Q', ''),
 ])
 print(json.dumps({'additional_context': ctx}, ensure_ascii=False))
