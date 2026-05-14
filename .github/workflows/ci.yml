@@ -97,5 +97,10 @@ jobs:
           assert a.file_view_parts.clear_button.objectName() == "file_view_clear"
           assert a.footer_parts is not None
           assert a.footer_parts.convert_button.isEnabled() is False
+          assert a.inspector_panel is not None
+          assert a.inspector_panel.objectName() == "inspector"
+          from PySide6.QtWidgets import QTabWidget
+          tabs = a.inspector_panel.findChild(QTabWidget, "inspector_tabs")
+          assert tabs is not None and tabs.count() == 3
           print("UI Qt offscreen OK :", a.zones.titlebar.objectName())
           PY

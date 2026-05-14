@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from ui_qt_conversion_worker import ConversionWorker
     from ui_qt_file_model import ConversionFileTableModel
     from ui_qt_file_proxy import ConversionFileFilterProxy
+    from ui_qt_inspector import MarkdownInspectorPanel
 
 
 WINDOW_TITLE = "Markdown Converter"
@@ -144,6 +145,7 @@ class MarkdownConverterQtApp:
         self.toolbar_parts: ToolbarParts | None = None
         self.output_banner_parts: OutputBannerParts | None = None
         self.footer_parts: FooterParts | None = None
+        self.inspector_panel: MarkdownInspectorPanel | None = None
         self.output_dir: Path | None = None
         self._worker: ConversionWorker | None = None
         self._worker_thread: QThread | None = None
@@ -176,7 +178,9 @@ class MarkdownConverterQtApp:
         central = QSplitter(Qt.Orientation.Horizontal, root)
         file_view, file_view_parts = _build_file_view()
         toolbar_area, toolbar_parts = _build_toolbar(file_view_parts.model)
-        inspector = _named_placeholder("inspector", "Inspecteur (sous-ticket #4)")
+        from ui_qt_inspector import MarkdownInspectorPanel
+
+        inspector = MarkdownInspectorPanel()
         central.addWidget(file_view)
         central.addWidget(inspector)
         central.setStretchFactor(0, 1)
@@ -211,6 +215,7 @@ class MarkdownConverterQtApp:
         self.toolbar_parts = toolbar_parts
         self.output_banner_parts = output_banner_parts
         self.footer_parts = footer_parts
+        self.inspector_panel = inspector
 
         output_banner_parts.choose_button.clicked.connect(self._on_choose_output_dir)
         footer_parts.convert_button.clicked.connect(self._on_convert_clicked)
@@ -224,6 +229,9 @@ class MarkdownConverterQtApp:
         file_view_parts.model.modelReset.connect(self._refresh_convert_button_state)
 
         _wire_toolbar(toolbar_parts, file_view_parts)
+        _wire_inspector_selection(file_view_parts, inspector)
+        # Si le modèle se réinitialise (fin de lot, vider…), on remet l'aperçu à zéro.
+        file_view_parts.model.modelReset.connect(self._reset_inspector_selection)
 
         return window
 
@@ -364,6 +372,10 @@ class MarkdownConverterQtApp:
         self._worker = None
         self._worker_thread = None
         self._refresh_convert_button_state()
+
+    def _reset_inspector_selection(self) -> None:
+        if self.inspector_panel is not None:
+            self.inspector_panel.set_record(None)
 
 
 def _named_placeholder(name: str, text: str) -> QWidget:
@@ -591,6 +603,29 @@ def _wire_toolbar(toolbar_parts: ToolbarParts, file_view_parts: FileViewParts) -
         btn.toggled.connect(lambda _checked=False: _apply_active_extensions())
 
     toolbar_parts.search_input.textChanged.connect(proxy.set_name_filter)
+
+
+def _wire_inspector_selection(
+    file_view_parts: FileViewParts,
+    inspector: MarkdownInspectorPanel,
+) -> None:
+    """Synchronise la sélection courante de la file avec l'inspecteur."""
+    from PySide6.QtCore import QModelIndex
+
+    selection_model = file_view_parts.table.selectionModel()
+    if selection_model is None:
+        return
+
+    def _on_current_row_changed(current: QModelIndex, _previous: QModelIndex) -> None:
+        if not current.isValid():
+            inspector.set_record(None)
+            return
+        rec = file_view_parts.proxy.source_record_at(current.row())
+        from converter import FileConversionRecord as _Record
+
+        inspector.set_record(rec if isinstance(rec, _Record) else None)
+
+    selection_model.currentRowChanged.connect(_on_current_row_changed)
 
 
 def _chip_label(ext: str, count: int) -> str:
