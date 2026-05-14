@@ -13,24 +13,28 @@ Vue d'ensemble :
 
 - ``MarkdownInspectorPanel`` est un ``QFrame`` qui contient un
   ``QTabWidget`` à 3 onglets : **Aperçu**, **Sortie**, **Détails**.
-- Pour cette PR (commit 2/5), seul l'onglet **Aperçu** est garni.
-  Les deux autres sont des placeholders cliquables affichant un message
-  explicite ; ils seront remplis par les commits 3, 4, 5.
-- ``set_record(record_or_none)`` met à jour l'onglet Aperçu (et restera
-  le point d'entrée unique pour les onglets futurs).
+- L'onglet **Aperçu** affiche le Markdown produit (mémoire ou disque).
+- L'onglet **Sortie** affiche le chemin ``.md`` et propose **Copier le
+  chemin** et **Ouvrir le dossier** (répertoire parent). Le renommage en
+  lot arrive au commit 4 ; l'onglet **Détails** reste un placeholder
+  jusqu'au commit 5.
+- ``set_record(record_or_none)`` met à jour les onglets pour le record
+  sélectionné (ou ``None``).
 """
 
 from __future__ import annotations
 
 import html
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices, QFont
 from PySide6.QtWidgets import (
     QFrame,
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QPushButton,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -39,10 +43,6 @@ from PySide6.QtWidgets import (
 
 from converter import ConversionStatus, FileConversionRecord
 from ui_qt_inspector_data import parse_front_matter
-
-if TYPE_CHECKING:
-    pass
-
 
 # --- Couleurs et polices ----------------------------------------------------
 # Alignées sur ``design_handoff_ui_refonte/README.md``.
@@ -123,11 +123,7 @@ class MarkdownInspectorPanel(QFrame):
         self._tabs.setObjectName("inspector_tabs")
 
         self._preview_tab = self._build_preview_tab()
-        self._output_tab = _placeholder_tab(
-            "Onglet « Sortie » — disponible dans le prochain commit (chemin .md, "
-            "copie et renommage en lot).",
-            "inspector_tab_output",
-        )
+        self._output_tab = self._build_output_tab()
         self._details_tab = _placeholder_tab(
             "Onglet « Détails » — disponible dans un commit ultérieur (format, "
             "taille, moteur, badge « secours », message d'erreur typé).",
@@ -140,7 +136,9 @@ class MarkdownInspectorPanel(QFrame):
         outer.addWidget(self._tabs)
 
         self._current_record: FileConversionRecord | None = None
+        self._resolved_output_path: Path | None = None
         self._render_empty_state()
+        self._refresh_output_tab(None)
 
     # --- Construction de l'onglet Aperçu ------------------------------------
 
@@ -188,6 +186,48 @@ class MarkdownInspectorPanel(QFrame):
 
         return widget
 
+    def _build_output_tab(self) -> QWidget:
+        """Onglet Sortie : chemin ``.md``, copie presse-papiers, ouverture du dossier parent."""
+        widget = QFrame()
+        widget.setObjectName("inspector_tab_output")
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        self._output_info = QLabel("", widget)
+        self._output_info.setObjectName("inspector_output_info")
+        self._output_info.setWordWrap(True)
+        layout.addWidget(self._output_info)
+
+        self._output_path = QLineEdit(widget)
+        self._output_path.setObjectName("inspector_output_path")
+        self._output_path.setReadOnly(True)
+        self._output_path.setFont(_mono_font())
+        self._output_path.setPlaceholderText("—")
+        layout.addWidget(self._output_path)
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        self._output_copy = QPushButton("Copier le chemin", widget)
+        self._output_copy.setObjectName("inspector_output_copy")
+        self._output_copy.setToolTip(
+            "Copier le chemin absolu du fichier Markdown dans le presse-papiers."
+        )
+        self._output_open_folder = QPushButton("Ouvrir le dossier", widget)
+        self._output_open_folder.setObjectName("inspector_output_open_folder")
+        self._output_open_folder.setToolTip(
+            "Ouvrir le dossier contenant le fichier Markdown dans le Finder ou l'explorateur."
+        )
+        row.addWidget(self._output_copy)
+        row.addWidget(self._output_open_folder)
+        row.addStretch(1)
+        layout.addLayout(row)
+
+        self._output_copy.clicked.connect(self._on_output_copy_path)
+        self._output_open_folder.clicked.connect(self._on_output_open_folder)
+
+        return widget
+
     # --- API publique --------------------------------------------------------
 
     def set_record(self, record: FileConversionRecord | None) -> None:
@@ -195,11 +235,11 @@ class MarkdownInspectorPanel(QFrame):
         self._current_record = record
         if record is None:
             self._render_empty_state()
-            return
-        if record.status not in _PREVIEWABLE_STATUSES:
+        elif record.status not in _PREVIEWABLE_STATUSES:
             self._render_non_success(record)
-            return
-        self._render_preview(record)
+        else:
+            self._render_preview(record)
+        self._refresh_output_tab(record)
 
     def current_record(self) -> FileConversionRecord | None:
         return self._current_record
@@ -260,6 +300,56 @@ class MarkdownInspectorPanel(QFrame):
         self._preview_message.setVisible(False)
         self._preview_message.clear()
         self._preview_body.setPlainText(parsed.body)
+
+    def _refresh_output_tab(self, record: FileConversionRecord | None) -> None:
+        """Met à jour le chemin ``.md`` et l'état des boutons Sortie."""
+        self._resolved_output_path = None
+        if record is None:
+            self._output_info.setText(
+                "Sélectionnez un fichier dans la file pour afficher le chemin du Markdown produit."
+            )
+            self._output_path.clear()
+            self._output_copy.setEnabled(False)
+            self._output_open_folder.setEnabled(False)
+            return
+
+        out = record.output_path
+        if out is None:
+            self._output_info.setText("Aucun fichier Markdown n'est encore associé à cette entrée.")
+            self._output_path.clear()
+            self._output_copy.setEnabled(False)
+            self._output_open_folder.setEnabled(False)
+            return
+
+        try:
+            resolved = out.resolve()
+        except OSError:
+            resolved = out
+
+        self._resolved_output_path = resolved
+        self._output_path.setText(str(resolved))
+        self._output_info.setText(
+            "Fichier Markdown produit. Vous pouvez copier le chemin absolu ou ouvrir son dossier parent."
+        )
+        self._output_copy.setEnabled(True)
+        self._output_open_folder.setEnabled(True)
+
+    def _on_output_copy_path(self) -> None:
+        if self._resolved_output_path is None:
+            return
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.clipboard().setText(str(self._resolved_output_path))
+
+    def _on_output_open_folder(self) -> None:
+        if self._resolved_output_path is None:
+            return
+        parent = self._resolved_output_path.parent
+        try:
+            folder = str(parent.resolve())
+        except OSError:
+            folder = str(parent)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
 
 
 def _read_markdown_text(record: FileConversionRecord) -> str | None:

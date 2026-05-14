@@ -167,6 +167,101 @@ def test_set_record_success_without_output_falls_back_to_message(
     assert "introuvable" in msg.text().lower() or "illisible" in msg.text().lower()
 
 
+def test_output_tab_shows_resolved_path_and_enables_buttons(qt_app: object, tmp_path: Path) -> None:
+    from PySide6.QtWidgets import QLineEdit, QPushButton
+
+    from ui_qt_inspector import MarkdownInspectorPanel
+
+    out = tmp_path / "sous" / "sortie.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("# x", encoding="utf-8")
+    rec = _make_record(tmp_path, output_path=out)
+    panel = MarkdownInspectorPanel()
+    panel.set_record(rec)
+
+    path_edit = panel.findChild(QLineEdit, "inspector_output_path")
+    assert path_edit is not None
+    assert str(out.resolve()) == path_edit.text()
+
+    copy_btn = panel.findChild(QPushButton, "inspector_output_copy")
+    open_btn = panel.findChild(QPushButton, "inspector_output_open_folder")
+    assert copy_btn is not None and open_btn is not None
+    assert copy_btn.isEnabled() is True
+    assert open_btn.isEnabled() is True
+
+
+def test_output_copy_puts_absolute_path_on_clipboard(qt_app: object, tmp_path: Path) -> None:
+    from PySide6.QtWidgets import QApplication, QPushButton
+
+    from ui_qt_inspector import MarkdownInspectorPanel
+
+    out = tmp_path / "out.md"
+    out.write_text("# x", encoding="utf-8")
+    rec = _make_record(tmp_path, output_path=out)
+    panel = MarkdownInspectorPanel()
+    panel.set_record(rec)
+
+    copy_btn = panel.findChild(QPushButton, "inspector_output_copy")
+    assert copy_btn is not None
+    copy_btn.click()
+    clip = QApplication.clipboard()
+    assert clip is not None
+    assert clip.text() == str(out.resolve())
+
+
+def test_output_open_folder_invokes_desktop_services(
+    qt_app: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PySide6.QtCore import QUrl
+    from PySide6.QtGui import QDesktopServices
+    from PySide6.QtWidgets import QPushButton
+
+    from ui_qt_inspector import MarkdownInspectorPanel
+
+    opened: list[QUrl] = []
+
+    def fake_open(url: QUrl) -> bool:
+        opened.append(url)
+        return True
+
+    monkeypatch.setattr(QDesktopServices, "openUrl", fake_open)
+
+    out = tmp_path / "d" / "f.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("# x", encoding="utf-8")
+    rec = _make_record(tmp_path, output_path=out)
+    panel = MarkdownInspectorPanel()
+    panel.set_record(rec)
+
+    open_btn = panel.findChild(QPushButton, "inspector_output_open_folder")
+    assert open_btn is not None
+    open_btn.click()
+
+    assert len(opened) == 1
+    assert opened[0].toLocalFile() == str(out.parent.resolve())
+
+
+def test_output_tab_no_path_when_error_without_output(qt_app: object, tmp_path: Path) -> None:
+    from PySide6.QtWidgets import QLineEdit, QPushButton
+
+    from converter import ConversionStatus
+    from ui_qt_inspector import MarkdownInspectorPanel
+
+    rec = _make_record(tmp_path, status=ConversionStatus.ERROR, message="Échec.", output_path=None)
+    panel = MarkdownInspectorPanel()
+    panel.set_record(rec)
+
+    path_edit = panel.findChild(QLineEdit, "inspector_output_path")
+    assert path_edit is not None
+    assert path_edit.text() == ""
+
+    copy_btn = panel.findChild(QPushButton, "inspector_output_copy")
+    open_btn = panel.findChild(QPushButton, "inspector_output_open_folder")
+    assert copy_btn is not None and open_btn is not None
+    assert copy_btn.isEnabled() is False
+    assert open_btn.isEnabled() is False
+
+
 def test_inspector_wired_to_file_selection(qt_app: object, tmp_path: Path) -> None:
     from PySide6.QtCore import QItemSelectionModel
 
