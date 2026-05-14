@@ -14,26 +14,31 @@ Vue d'ensemble :
 - ``MarkdownInspectorPanel`` est un ``QFrame`` qui contient un
   ``QTabWidget`` à 3 onglets : **Aperçu**, **Sortie**, **Détails**.
 - L'onglet **Aperçu** affiche le Markdown produit (mémoire ou disque).
-- L'onglet **Sortie** affiche le chemin ``.md`` et propose **Copier le
-  chemin** et **Ouvrir le dossier** (répertoire parent). Le renommage en
-  lot arrive au commit 4 ; l'onglet **Détails** reste un placeholder
+- L'onglet **Sortie** affiche le chemin ``.md``, copie / dossier parent, et le
+  **renommage en lot** (préfixe, suffixe, casse, aperçu live, application
+  atomique après validation). L'onglet **Détails** reste un placeholder
   jusqu'au commit 5.
 - ``set_record(record_or_none)`` met à jour les onglets pour le record
   sélectionné (ou ``None``).
+- ``set_file_model(model)`` relie le renommage en lot à la file (appelé depuis
+  ``MarkdownConverterQtApp.build()``).
 """
 
 from __future__ import annotations
 
 import html
+from contextlib import suppress
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QFont
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QTabWidget,
     QTextEdit,
@@ -42,7 +47,17 @@ from PySide6.QtWidgets import (
 )
 
 from converter import ConversionStatus, FileConversionRecord
+from ui_qt_file_model import ConversionFileTableModel
 from ui_qt_inspector_data import parse_front_matter
+from ui_qt_inspector_rename import (
+    CASE_LOWER,
+    CASE_TITLE,
+    CASE_UNCHANGED,
+    CASE_UPPER,
+    build_new_output_path,
+    execute_rename_plan,
+    plan_bulk_rename,
+)
 
 # --- Couleurs et polices ----------------------------------------------------
 # Alignées sur ``design_handoff_ui_refonte/README.md``.
@@ -137,6 +152,7 @@ class MarkdownInspectorPanel(QFrame):
 
         self._current_record: FileConversionRecord | None = None
         self._resolved_output_path: Path | None = None
+        self._file_model: ConversionFileTableModel | None = None
         self._render_empty_state()
         self._refresh_output_tab(None)
 
@@ -226,6 +242,67 @@ class MarkdownInspectorPanel(QFrame):
         self._output_copy.clicked.connect(self._on_output_copy_path)
         self._output_open_folder.clicked.connect(self._on_output_open_folder)
 
+        line_bulk = QFrame(widget)
+        line_bulk.setFrameShape(QFrame.Shape.HLine)
+        line_bulk.setObjectName("inspector_output_bulk_separator")
+        layout.addWidget(line_bulk)
+
+        bulk_title = QLabel(
+            "Renommage en lot : s'applique à tous les fichiers Markdown produits listés dans la file.",
+            widget,
+        )
+        bulk_title.setObjectName("inspector_output_bulk_title")
+        bulk_title.setWordWrap(True)
+        layout.addWidget(bulk_title)
+
+        affix_row = QHBoxLayout()
+        affix_row.setSpacing(8)
+        affix_row.addWidget(QLabel("Préfixe", widget))
+        self._bulk_prefix = QLineEdit(widget)
+        self._bulk_prefix.setObjectName("inspector_bulk_prefix")
+        self._bulk_prefix.setPlaceholderText("ex. rapport_")
+        affix_row.addWidget(self._bulk_prefix, stretch=1)
+        affix_row.addWidget(QLabel("Suffixe", widget))
+        self._bulk_suffix = QLineEdit(widget)
+        self._bulk_suffix.setObjectName("inspector_bulk_suffix")
+        self._bulk_suffix.setPlaceholderText("ex. _v2")
+        affix_row.addWidget(self._bulk_suffix, stretch=1)
+        affix_row.addWidget(QLabel("Casse", widget))
+        self._bulk_case = QComboBox(widget)
+        self._bulk_case.setObjectName("inspector_bulk_case")
+        self._bulk_case.addItem("Inchangé", CASE_UNCHANGED)
+        self._bulk_case.addItem("minuscules", CASE_LOWER)
+        self._bulk_case.addItem("MAJUSCULES", CASE_UPPER)
+        self._bulk_case.addItem("Format titre", CASE_TITLE)
+        affix_row.addWidget(self._bulk_case)
+        layout.addLayout(affix_row)
+
+        self._bulk_preview = QLabel("", widget)
+        self._bulk_preview.setObjectName("inspector_bulk_preview")
+        self._bulk_preview.setWordWrap(True)
+        self._bulk_preview.setFont(_mono_font())
+        layout.addWidget(self._bulk_preview)
+
+        self._bulk_plan_error = QLabel("", widget)
+        self._bulk_plan_error.setObjectName("inspector_bulk_plan_error")
+        self._bulk_plan_error.setWordWrap(True)
+        self._bulk_plan_error.setStyleSheet("color: #b00020;")
+        self._bulk_plan_error.hide()
+        layout.addWidget(self._bulk_plan_error)
+
+        self._bulk_apply = QPushButton("Appliquer le renommage en lot", widget)
+        self._bulk_apply.setObjectName("inspector_bulk_apply")
+        self._bulk_apply.setToolTip(
+            "Renomme sur le disque tous les fichiers .md de sortie de la file. "
+            "Si une cible existe déjà, aucun fichier n'est modifié."
+        )
+        layout.addWidget(self._bulk_apply)
+
+        self._bulk_prefix.textChanged.connect(self._sync_bulk_rename_ui)
+        self._bulk_suffix.textChanged.connect(self._sync_bulk_rename_ui)
+        self._bulk_case.currentIndexChanged.connect(self._sync_bulk_rename_ui)
+        self._bulk_apply.clicked.connect(self._on_bulk_rename_apply)
+
         return widget
 
     # --- API publique --------------------------------------------------------
@@ -311,6 +388,7 @@ class MarkdownInspectorPanel(QFrame):
             self._output_path.clear()
             self._output_copy.setEnabled(False)
             self._output_open_folder.setEnabled(False)
+            self._sync_bulk_rename_ui()
             return
 
         out = record.output_path
@@ -319,6 +397,7 @@ class MarkdownInspectorPanel(QFrame):
             self._output_path.clear()
             self._output_copy.setEnabled(False)
             self._output_open_folder.setEnabled(False)
+            self._sync_bulk_rename_ui()
             return
 
         try:
@@ -333,6 +412,7 @@ class MarkdownInspectorPanel(QFrame):
         )
         self._output_copy.setEnabled(True)
         self._output_open_folder.setEnabled(True)
+        self._sync_bulk_rename_ui()
 
     def _on_output_copy_path(self) -> None:
         if self._resolved_output_path is None:
@@ -350,6 +430,100 @@ class MarkdownInspectorPanel(QFrame):
         except OSError:
             folder = str(parent)
         QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
+
+    def set_file_model(self, model: ConversionFileTableModel | None) -> None:
+        """Branche le renommage en lot sur le modèle de la file (ou ``None``)."""
+        if self._file_model is not None:
+            for sig in (
+                self._file_model.rowsInserted,
+                self._file_model.rowsRemoved,
+                self._file_model.modelReset,
+                self._file_model.dataChanged,
+            ):
+                with suppress(TypeError):
+                    sig.disconnect(self._sync_bulk_rename_ui)
+        self._file_model = model
+        if model is not None:
+            model.rowsInserted.connect(self._sync_bulk_rename_ui)
+            model.rowsRemoved.connect(self._sync_bulk_rename_ui)
+            model.modelReset.connect(self._sync_bulk_rename_ui)
+            model.dataChanged.connect(self._sync_bulk_rename_ui)
+        self._sync_bulk_rename_ui()
+
+    def _bulk_case_mode(self) -> str:
+        raw = self._bulk_case.currentData(Qt.ItemDataRole.UserRole)
+        return raw if isinstance(raw, str) else CASE_UNCHANGED
+
+    def _sync_bulk_rename_ui(self) -> None:
+        """Aperçu live du nom cible + validation du plan en lot."""
+        if self._file_model is None:
+            for w in (self._bulk_prefix, self._bulk_suffix, self._bulk_case, self._bulk_apply):
+                w.setEnabled(False)
+            self._bulk_preview.setText("—")
+            self._bulk_plan_error.clear()
+            self._bulk_plan_error.hide()
+            return
+
+        for w in (self._bulk_prefix, self._bulk_suffix, self._bulk_case, self._bulk_apply):
+            w.setEnabled(True)
+
+        prefix = self._bulk_prefix.text()
+        suffix = self._bulk_suffix.text()
+        case_mode = self._bulk_case_mode()
+
+        rec = self._current_record
+        if (
+            rec is not None
+            and rec.status in _PREVIEWABLE_STATUSES
+            and rec.output_path is not None
+            and rec.output_path.suffix.lower() == ".md"
+        ):
+            preview_path = build_new_output_path(rec.output_path, prefix, suffix, case_mode)
+            try:
+                preview_txt = str(preview_path.resolve())
+            except OSError:
+                preview_txt = str(preview_path)
+            self._bulk_preview.setText(f"Aperçu (fichier sélectionné) : {preview_txt}")
+        else:
+            self._bulk_preview.setText("Aperçu (fichier sélectionné) : —")
+
+        ops, err = plan_bulk_rename(self._file_model.records(), prefix, suffix, case_mode)
+        if err:
+            self._bulk_plan_error.setText(err)
+            self._bulk_plan_error.show()
+            self._bulk_apply.setEnabled(False)
+            return
+
+        self._bulk_plan_error.clear()
+        self._bulk_plan_error.hide()
+        self._bulk_apply.setEnabled(bool(ops))
+
+    def _on_bulk_rename_apply(self) -> None:
+        model = self._file_model
+        if model is None:
+            return
+        prefix = self._bulk_prefix.text()
+        suffix = self._bulk_suffix.text()
+        case_mode = self._bulk_case_mode()
+        ops, err = plan_bulk_rename(model.records(), prefix, suffix, case_mode)
+        if err:
+            QMessageBox.warning(self, "Renommage impossible", err)
+            return
+        if not ops:
+            QMessageBox.information(
+                self,
+                "Renommage en lot",
+                "Aucun fichier à renommer : vérifiez que la file contient des conversions "
+                "réussies avec un fichier .md en sortie, ou modifiez préfixe / suffixe / casse.",
+            )
+            return
+        ok, msg = execute_rename_plan(ops)
+        if not ok:
+            QMessageBox.critical(self, "Renommage en lot", msg)
+            return
+        model.refresh_all()
+        self._refresh_output_tab(self._current_record)
+        self._sync_bulk_rename_ui()
 
 
 def _read_markdown_text(record: FileConversionRecord) -> str | None:

@@ -230,6 +230,7 @@ class MarkdownConverterQtApp:
 
         _wire_toolbar(toolbar_parts, file_view_parts)
         _wire_inspector_selection(file_view_parts, inspector)
+        inspector.set_file_model(file_view_parts.model)
         # Si le modèle se réinitialise (fin de lot, vider…), on remet l'aperçu à zéro.
         file_view_parts.model.modelReset.connect(self._reset_inspector_selection)
 

@@ -262,6 +262,44 @@ def test_output_tab_no_path_when_error_without_output(qt_app: object, tmp_path: 
     assert open_btn.isEnabled() is False
 
 
+def test_output_tab_bulk_rename_apply_updates_model_and_disk(
+    qt_app: object, tmp_path: Path
+) -> None:
+    from PySide6.QtWidgets import QLineEdit, QPushButton
+
+    from converter import ConversionStatus, FileConversionRecord
+    from ui_qt_file_model import ConversionFileTableModel
+    from ui_qt_inspector import MarkdownInspectorPanel
+
+    a = tmp_path / "a.md"
+    b = tmp_path / "b.md"
+    a.write_text("A")
+    b.write_text("B")
+    r1 = FileConversionRecord(
+        source_path=tmp_path / "s1.docx", status=ConversionStatus.SUCCESS, output_path=a
+    )
+    r2 = FileConversionRecord(
+        source_path=tmp_path / "s2.docx", status=ConversionStatus.SUCCESS, output_path=b
+    )
+    model = ConversionFileTableModel([r1, r2])
+    panel = MarkdownInspectorPanel()
+    panel.set_file_model(model)
+
+    prefix = panel.findChild(QLineEdit, "inspector_bulk_prefix")
+    assert prefix is not None
+    prefix.setText("LOT_")
+
+    apply_btn = panel.findChild(QPushButton, "inspector_bulk_apply")
+    assert apply_btn is not None
+    assert apply_btn.isEnabled() is True
+    apply_btn.click()
+
+    assert r1.output_path == tmp_path / "LOT_a.md"
+    assert r2.output_path == tmp_path / "LOT_b.md"
+    assert (tmp_path / "LOT_a.md").read_text() == "A"
+    assert not a.exists()
+
+
 def test_inspector_wired_to_file_selection(qt_app: object, tmp_path: Path) -> None:
     from PySide6.QtCore import QItemSelectionModel
 
