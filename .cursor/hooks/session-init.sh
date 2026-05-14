@@ -32,6 +32,20 @@ _cmd_timeout_capture() {
   return "$ec"
 }
 
+# Ruff : PATH minimal des hooks → repli sur le venv du dépôt.
+_ruff_bin() {
+  if command -v ruff >/dev/null 2>&1; then
+    command -v ruff
+    return 0
+  fi
+  if [ -x "$ROOT/.venv/bin/ruff" ]; then
+    printf '%s' "$ROOT/.venv/bin/ruff"
+    return 0
+  fi
+  printf ''
+  return 1
+}
+
 # Consommer stdin (JSON Cursor) sans bloquer si le flux ne se ferme pas (ex. sandbox).
 if [ ! -t 0 ]; then
   python3 -c '
@@ -97,8 +111,9 @@ fi
 
 # --- 3. Ruff ---
 LINE_RUFF="Ruff : statut inconnu (commande absente)."
-if command -v ruff >/dev/null 2>&1; then
-  ruff_out="$(_cmd_timeout_capture 45 ruff check . --output-format=json)"
+RUFF_BIN="$(_ruff_bin 2>/dev/null)" || RUFF_BIN=""
+if [ -n "$RUFF_BIN" ]; then
+  ruff_out="$(_cmd_timeout_capture 45 "$RUFF_BIN" check . --output-format=json)"
   ruff_ec=$?
   if ! printf '%s' "$ruff_out" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
     LINE_RUFF="Ruff : statut inconnu (sortie invalide ou ruff en erreur fatale)."
