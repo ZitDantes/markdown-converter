@@ -28,6 +28,22 @@ Lecture, exploration du code, propositions de diffs, et exécution de tests loca
 
 ## 3. Boucle de travail standard
 
+### Rituel pre-session (début de session uniquement)
+
+Au tout début de chaque **nouvelle** session, **avant toute autre action**, l'agent produit automatiquement un **résumé d'état du projet** en **cinq points**, présenté sous forme de **liste numérotée ou à puces** :
+
+1. **Branche Git** active et **dernier commit** (message et date).
+2. **CI GitHub Actions** : état **vert** / **rouge** / **inconnu** (ex. absence d'accès `gh` ou pas de workflow applicable).
+3. **Tickets Linear ouverts** avec leur **statut actuel** (via le **MCP Linear** ; préciser le périmètre consulté si nécessaire, ex. équipe `PLO`).
+4. **Fichiers modifiés non commités** s'il y en a (sinon l'indiquer explicitement).
+5. **Ruff** : résultat de `ruff check .` — **propre** ou **erreurs en attente** (exécution en début de session pour refléter l'état réel ; si la commande ne peut pas être lancée, l'indiquer clairement).
+
+**Contraintes de forme** : chaque point — **cinq lignes maximum** ; le bloc se termine par la question ouverte : **« Sur quoi travaille-t-on aujourd'hui ? »**
+
+**Portée temporelle** : ce rituel s'applique **uniquement** au **premier** message d'une **nouvelle** session. L'agent **ne le répète pas** sur les messages suivants de la même session (y compris après reprise de contexte ou changement de sujet dans le fil).
+
+> **Note** : la lecture du statut CI et l'interrogation Linear peuvent nécessiter des appels réseau/outils ; ils restent dans le cadre des actions **autorisées sans confirmation** décrites en §2 pour l'exploration et les vérifications locales.
+
 Pour toute nouvelle tâche significative :
 
 1. **Comprendre le besoin** — récupérer le ticket Linear concerné (`PLO-<n>`) via le MCP et reformuler l'objectif en une phrase pour validation.
