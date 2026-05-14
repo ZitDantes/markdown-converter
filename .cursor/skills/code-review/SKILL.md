@@ -89,7 +89,7 @@ Depuis la branche reviewée (`gh pr checkout <num>` puis revenir sur sa branche 
 source .venv/bin/activate
 ruff check .                                            # doit être clean
 ruff format --check .                                   # doit être clean
-python3 -c "import main, ui, converter, utils, report"  # smoke import
+python3 -c "import main, ui, converter, utils, report, errors, logging_setup; import engines.markitdown_engine, engines.pandoc_engine"  # smoke import
 ```
 
 Tout `# noqa` ajouté par la PR doit être justifié (commentaire dans le code ou ticket de suivi). Idem pour toute nouvelle dépendance ajoutée à `requirements.txt` ou `requirements-dev.txt`.
@@ -98,10 +98,15 @@ Tout `# noqa` ajouté par la PR doit être justifié (commentaire dans le code o
 
 Points d'attention obligatoires sur ce projet :
 
+**Bloquants**
+
 - [ ] Aucun secret, token, ou chemin absolu personnel (`/Users/<nom>/...`) committé.
-- [ ] Aucune dépendance ajoutée sans justification dans le body de la PR (AGENTS.md §4).
 - [ ] Aucun appel réseau ni télémétrie introduit (AGENTS.md §9, l'app est 100 % locale).
 - [ ] Aucun fichier `build/`, `dist/`, `.venv/`, `__pycache__/`, `.DS_Store`, `.zip`, `.dmg` committé.
+
+**Hygiène et conformité**
+
+- [ ] Aucune dépendance ajoutée sans justification dans le body de la PR (AGENTS.md §4).
 - [ ] Si UI modifiée : capture ou description du test manuel.
 - [ ] Si packaging modifié : mention de la reconstruction `.app` réussie.
 - [ ] Commentaires de code : utiles uniquement, pas de narration ligne à ligne.

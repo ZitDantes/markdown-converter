@@ -2,6 +2,10 @@
 
 Ce fichier décrit comment les agents IA (Cursor, et tout autre outil compatible AGENTS.md) doivent collaborer sur ce projet. Il complète `README.md` (qui s'adresse aux humains).
 
+## 0. Vision produit
+
+Produit **open source** pour quiconque **utilise des LLM** et veut **importer des documents bureautiques** (usage **glisser-déposer**, profils **peu techniques** inclus) afin d'obtenir du **Markdown** pour **RAG** ou **contexte LLM**. **Contrainte absolue :** traitement **100 % local** — **aucune donnée** vers un **service cloud**.
+
 ## 1. Stack et rôles
 
 - **Linear** (préfixe d'équipe : `PLO`) — source de vérité du **backlog**, des specs et de l'avancement.
@@ -36,6 +40,15 @@ Pour toute nouvelle tâche significative :
 4. **Pull Request** — titre `PLO-<n> — <description>`, description contenant `Closes PLO-<n>` pour fermer automatiquement le ticket au merge.
 5. **Review structurée** — avant le merge, lancer le skill [`code-review`](.cursor/skills/code-review/SKILL.md) qui restitue un verdict (bloquants / suggestions / points positifs) aligné sur les règles d'AGENTS.md. Le skill ne merge **jamais** automatiquement et ne fait **jamais** d'`approve` sur GitHub sans validation explicite ; il propose les actions à exécuter (`gh pr review --approve`, etc.) et attend un « ok ».
 6. **Mise à jour Linear** — proposer (jamais imposer) le passage du ticket en *In Progress* au début, *In Review* à l'ouverture de la PR, *Done* à la fusion.
+
+#### Définition de Done
+
+Une issue est considérée **Done** lorsque **toutes** les conditions suivantes sont remplies :
+
+1. La **CI GitHub Actions** est **verte** sur la branche mergée.
+2. `ruff check .` et `ruff format --check .` sont **sans erreur**.
+3. Le **smoke import** (voir skill `code-review`, étape 5) **passe sans erreur**.
+4. La **PR est mergée** et le **ticket Linear est fermé** (ex. via `Closes PLO-<n>`).
 
 ### Après le merge : nettoyage automatique
 
