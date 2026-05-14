@@ -208,8 +208,8 @@ Pour **contribuer au code** (correctifs, évolutions, documentation technique), 
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Guide de contribution (humains) : setup, lint, tests, PR, dépendances. |
 | `main.py` | Lancement de l’application. |
 | `ui.py` | Interface Tkinter (français, **par défaut**). |
-| `ui_qt.py` | Interface PySide6 (**prototype**, opt-in via `MARKDOWN_CONVERTER_UI=qt`, voir [Prototype d'UI PySide6](#prototype-dui-pyside6)). |
-| `requirements-qt.txt` | Dépendances optionnelles pour le prototype Qt (`PySide6`). |
+| `ui_qt.py` | Interface PySide6 (opt-in via `MARKDOWN_CONVERTER_UI=qt`, voir [Prototype d'UI PySide6](#prototype-dui-pyside6)). |
+| `requirements-qt.txt` | Dépendances optionnelles pour l'UI PySide6 (`PySide6`). |
 | `converter.py` | Orchestration du lot (boucle, statut par fichier, rapport). |
 | `engines/` | Moteurs de conversion isolés derrière une interface commune. |
 | `engines/base.py` | Classe abstraite `ConverterEngine` et exceptions custom. |
@@ -231,7 +231,7 @@ Pour les UIs qui veulent afficher un **aperçu** du Markdown produit sans relire
 
 #### Prototype d'UI PySide6
 
-L'interface Tkinter (`ui.py`) reste l'UI par défaut. Une refonte en PySide6 est en cours dans `ui_qt.py` (épic [PLO-26](https://linear.app/dantes/issue/PLO-26)). Pour l'essayer :
+L'interface Tkinter (`ui.py`) reste l'UI par défaut. L'UI PySide6 vit dans `ui_qt.py` et les modules `ui_qt_*.py` ; l'épic [PLO-26](https://linear.app/dantes/issue/PLO-26) est **terminé** (sous-tickets [PLO-34](https://linear.app/dantes/issue/PLO-34) à [PLO-39](https://linear.app/dantes/issue/PLO-39)). Pour l'essayer :
 
 ```bash
 source .venv/bin/activate
@@ -239,7 +239,7 @@ pip install -r requirements-qt.txt   # ajoute PySide6 (dépendance facultative)
 MARKDOWN_CONVERTER_UI=qt python3 main.py
 ```
 
-À ce stade (PLO-34), seul le **squelette** est livré : fenêtre principale, zones nommées, aucun comportement fonctionnel. Les fonctionnalités complètes arrivent dans les sous-tickets [PLO-35](https://linear.app/dantes/issue/PLO-35) à [PLO-39](https://linear.app/dantes/issue/PLO-39). Si PySide6 n'est pas installé alors que `MARKDOWN_CONVERTER_UI=qt`, l'application affiche un message et retombe automatiquement sur Tkinter.
+La **file** de conversion (tri, filtres, recherche), l'exécution du lot dans un **thread** dédié, la **toolbar**, l'**inspecteur** (aperçu Markdown, sortie, détails), le **journal** repliable et le **pied de page** (progression, ETA, rapport) sont implémentés. La suite (glisser-déposer, thème clair/sombre persisté, exposition des moteurs, etc.) est suivie dans le projet Linear [Refonte interface (PySide6)](https://linear.app/dantes/project/refonte-interface-pyside6-a49711c9504d) ([PLO-27](https://linear.app/dantes/issue/PLO-27), [PLO-28](https://linear.app/dantes/issue/PLO-28), [PLO-33](https://linear.app/dantes/issue/PLO-33), …). Si PySide6 n'est pas installé alors que `MARKDOWN_CONVERTER_UI=qt`, l'application affiche un message et retombe automatiquement sur Tkinter.
 
 #### Ajouter un moteur de conversion
 
