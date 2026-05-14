@@ -5,9 +5,10 @@ Ce module est **désactivé par défaut** : il n'est utilisé que si la variable
 d'environnement ``MARKDOWN_CONVERTER_UI`` vaut ``qt``. PLO-34 a posé le
 squelette ; PLO-35 a livré la file et le worker ; PLO-36 garnit la **toolbar**
 (chips, recherche) et renforce le **bandeau de sortie** (validation écriture)
-ainsi que le bouton **Vider** sur la file. Le rendu reste volontairement
-sobre (mockup fonctionnel) ; le polish visuel arrive avec PLO-28 et les
-tickets suivants.
+ainsi que le bouton **Vider** sur la file. PLO-37 livre le **journal** bas
+(filtres niveau, lien vers ``run.log``). Le rendu reste volontairement sobre
+(mockup fonctionnel) ; le polish visuel arrive avec PLO-28 et les tickets
+suivants.
 
 Architecture cible (cf. ``design_handoff_ui_refonte/README.md``) ::
 
@@ -51,6 +52,7 @@ if TYPE_CHECKING:
     from ui_qt_file_model import ConversionFileTableModel
     from ui_qt_file_proxy import ConversionFileFilterProxy
     from ui_qt_inspector import MarkdownInspectorPanel
+    from ui_qt_journal import ConversionJournalPanel
 
 
 WINDOW_TITLE = "Markdown Converter"
@@ -120,8 +122,9 @@ class OutputBannerParts:
 
 @dataclass
 class FooterParts:
-    """Sous-widgets du footer minimal (PLO-35) ; sera enrichi en PLO-38."""
+    """Sous-widgets du footer minimal (PLO-35) ; bouton journal (PLO-37)."""
 
+    journal_toggle_button: QPushButton
     convert_button: QPushButton
     status_label: QLabel
 
@@ -145,6 +148,7 @@ class MarkdownConverterQtApp:
         self.toolbar_parts: ToolbarParts | None = None
         self.output_banner_parts: OutputBannerParts | None = None
         self.footer_parts: FooterParts | None = None
+        self.journal_panel: ConversionJournalPanel | None = None
         self.inspector_panel: MarkdownInspectorPanel | None = None
         self.output_dir: Path | None = None
         self._worker: ConversionWorker | None = None
@@ -189,8 +193,11 @@ class MarkdownConverterQtApp:
         central.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         footer, footer_parts = _build_footer()
-        journal = _named_placeholder("journal", "Journal (sous-ticket #6) — caché par défaut")
-        journal.setVisible(False)
+        from ui_qt_journal import ConversionJournalPanel
+
+        journal_panel = ConversionJournalPanel()
+        journal_panel.setVisible(False)
+        journal = journal_panel
 
         for w in (titlebar, toolbar_area, output_banner):
             root_layout.addWidget(w)
@@ -215,9 +222,11 @@ class MarkdownConverterQtApp:
         self.toolbar_parts = toolbar_parts
         self.output_banner_parts = output_banner_parts
         self.footer_parts = footer_parts
+        self.journal_panel = journal_panel
         self.inspector_panel = inspector
 
         output_banner_parts.choose_button.clicked.connect(self._on_choose_output_dir)
+        footer_parts.journal_toggle_button.toggled.connect(journal_panel.setVisible)
         footer_parts.convert_button.clicked.connect(self._on_convert_clicked)
         footer_parts.convert_button.setEnabled(False)
         file_view_parts.clear_button.clicked.connect(self._on_clear_file_list)
@@ -298,7 +307,7 @@ class MarkdownConverterQtApp:
     def _on_convert_clicked(self) -> None:
         if self.output_dir is None or self.file_view_parts is None or self.footer_parts is None:
             return
-        from PySide6.QtCore import QThread
+        from PySide6.QtCore import Qt, QThread
 
         from ui_qt_conversion_worker import ConversionWorker
 
@@ -315,6 +324,11 @@ class MarkdownConverterQtApp:
         thread = QThread()
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
+        if self.journal_panel is not None:
+            worker.log.connect(
+                self.journal_panel.append_log,
+                Qt.ConnectionType.QueuedConnection,
+            )
         worker.progress.connect(self._on_worker_progress)
         worker.finished.connect(self._on_worker_finished)
         worker.failed.connect(self._on_worker_failed)
@@ -431,7 +445,7 @@ def _build_output_banner() -> tuple[QWidget, OutputBannerParts]:
 
 
 def _build_footer() -> tuple[QWidget, FooterParts]:
-    """Footer minimal (PLO-35) : statut + bouton **Convertir** primaire."""
+    """Footer minimal (PLO-35) : statut + journal (PLO-37) + **Convertir**."""
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
 
@@ -444,12 +458,21 @@ def _build_footer() -> tuple[QWidget, FooterParts]:
     status = QLabel("Prêt.", frame)
     status.setObjectName("footer_status")
     status.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+    journal_toggle = QPushButton("Journal", frame)
+    journal_toggle.setObjectName("footer_journal_toggle")
+    journal_toggle.setCheckable(True)
+    journal_toggle.setToolTip("Afficher ou masquer le journal de conversion.")
     convert = QPushButton("Convertir", frame)
     convert.setObjectName("footer_convert")
     convert.setDefault(True)
     layout.addWidget(status, stretch=1)
+    layout.addWidget(journal_toggle)
     layout.addWidget(convert)
-    return frame, FooterParts(convert_button=convert, status_label=status)
+    return frame, FooterParts(
+        journal_toggle_button=journal_toggle,
+        convert_button=convert,
+        status_label=status,
+    )
 
 
 def _build_file_view() -> tuple[QWidget, FileViewParts]:
