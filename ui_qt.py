@@ -7,10 +7,11 @@ squelette ; PLO-35 a livré la file et le worker ; PLO-36 garnit la **toolbar**
 (chips, recherche) et renforce le **bandeau de sortie** (validation écriture)
 ainsi que le bouton **Vider** sur la file. PLO-37 livre le **journal** bas
 (filtres niveau, lien vers ``run.log``). PLO-39 enrichit le **footer** (progress
-globale, compteurs, ETA, rapport) et la **titlebar** (pastille Pandoc, embase
-thème sans logique). PLO-27 ajoute le **glisser-déposer** natif sur la file
-(overlay pointillé). Le rendu reste volontairement sobre (mockup fonctionnel) ;
-le polish visuel arrive avec PLO-28 et les tickets suivants.
+globale, compteurs, ETA, rapport) et la **titlebar** (pastille Pandoc, bouton
+thème). PLO-27 ajoute le **glisser-déposer** natif sur la file
+(overlay pointillé). PLO-28 livre le **thème clair / sombre** persistant
+(``ui_qt_settings`` / ``ui_qt_theme``). D'autres tickets complètent la persistance
+file (PLO-29), etc.
 
 Architecture cible (cf. ``design_handoff_ui_refonte/README.md``) ::
 
@@ -250,6 +251,7 @@ class MarkdownConverterQtApp:
         self._worker_ui_sink: object | None = None
         self._last_summary: Any = None  # ``ConversionSummary`` après un lot réussi
         self._batch_start_monotonic: float | None = None
+        self._qt_theme: str = "light"
 
     def build(self) -> QMainWindow:
         """Construit et retourne la ``QMainWindow``. Ne l'affiche pas."""
@@ -344,7 +346,49 @@ class MarkdownConverterQtApp:
 
         self._worker_ui_sink = _install_worker_ui_sink(self, window)
 
+        from PySide6.QtWidgets import QApplication
+
+        from ui_qt_settings import load_theme
+        from ui_qt_theme import apply_qt_theme
+
+        self._qt_theme = load_theme()
+        app_inst = QApplication.instance()
+        if app_inst is not None:
+            apply_qt_theme(app_inst, window, self._qt_theme)
+        titlebar_parts.theme_placeholder.clicked.connect(self._on_theme_button_clicked)
+        self._sync_theme_button()
+
         return window
+
+    def _sync_theme_button(self) -> None:
+        if self.titlebar_parts is None:
+            return
+        btn = self.titlebar_parts.theme_placeholder
+        if self._qt_theme == "light":
+            btn.setText("Sombre")
+            btn.setToolTip("Activer le thème sombre (moins de lumière).")
+        else:
+            btn.setText("Clair")
+            btn.setToolTip("Revenir au thème clair.")
+
+    def _on_theme_button_clicked(self) -> None:
+        next_theme = "dark" if self._qt_theme == "light" else "light"
+        self._apply_theme(next_theme)
+
+    def _apply_theme(self, theme: str) -> None:
+        if theme not in ("light", "dark"):
+            return
+        self._qt_theme = theme
+        from PySide6.QtWidgets import QApplication
+
+        from ui_qt_settings import save_theme
+        from ui_qt_theme import apply_qt_theme
+
+        save_theme(theme)
+        app_inst = QApplication.instance()
+        if app_inst is not None and self._window is not None:
+            apply_qt_theme(app_inst, self._window, theme)
+        self._sync_theme_button()
 
     def set_output_dir(self, output_dir: Path) -> None:
         """Sélectionne le dossier de sortie après validation (existence + écriture)."""
@@ -639,10 +683,9 @@ def _build_titlebar() -> tuple[QWidget, TitlebarParts]:
         )
 
     theme = QPushButton("Thème", frame)
-    theme.setObjectName("titlebar_theme_placeholder")
-    theme.setEnabled(False)
+    theme.setObjectName("titlebar_theme")
     theme.setFlat(True)
-    theme.setToolTip("Basculer clair / sombre — bientôt disponible (PLO-28).")
+    theme.setToolTip("")
 
     layout.addWidget(pandoc)
     layout.addWidget(theme)

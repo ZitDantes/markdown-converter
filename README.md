@@ -210,6 +210,8 @@ Pour **contribuer au code** (correctifs, évolutions, documentation technique), 
 | `ui.py` | Interface Tkinter (français, **par défaut**). |
 | `ui_qt.py` | Interface PySide6 (opt-in via `MARKDOWN_CONVERTER_UI=qt`, voir [Prototype d'UI PySide6](#prototype-dui-pyside6)). |
 | `ui_qt_file_drop_table.py` | Vue de file avec glisser-déposer natif (fichiers et dossiers, même règles que l'ajout par boutons). |
+| `ui_qt_settings.py` | Chemins et lecture/écriture du fichier JSON de préférences Qt (thème, extensible PLO-29). |
+| `ui_qt_theme.py` | Application du thème clair / sombre (palette Fusion). |
 | `requirements-qt.txt` | Dépendances optionnelles pour l'UI PySide6 (`PySide6`). |
 | `converter.py` | Orchestration du lot (boucle, statut par fichier, rapport). |
 | `engines/` | Moteurs de conversion isolés derrière une interface commune. |
@@ -240,7 +242,7 @@ pip install -r requirements-qt.txt   # ajoute PySide6 (dépendance facultative)
 MARKDOWN_CONVERTER_UI=qt python3 main.py
 ```
 
-La **file** de conversion (tri, filtres, recherche, **glisser-déposer** de fichiers et dossiers depuis le gestionnaire de fichiers avec surbrillance au survol), l'exécution du lot dans un **thread** dédié, la **toolbar**, l'**inspecteur** (aperçu Markdown, sortie, détails), le **journal** repliable et le **pied de page** (progression, ETA, rapport) sont implémentés. La suite (thème clair/sombre persisté, exposition des moteurs, etc.) est suivie dans le projet Linear [Refonte interface (PySide6)](https://linear.app/dantes/project/refonte-interface-pyside6-a49711c9504d) ([PLO-28](https://linear.app/dantes/issue/PLO-28), [PLO-33](https://linear.app/dantes/issue/PLO-33), …). Si PySide6 n'est pas installé alors que `MARKDOWN_CONVERTER_UI=qt`, l'application affiche un message et retombe automatiquement sur Tkinter.
+La **file** de conversion (tri, filtres, recherche, **glisser-déposer** de fichiers et dossiers depuis le gestionnaire de fichiers avec surbrillance au survol), l'exécution du lot dans un **thread** dédié, la **toolbar**, l'**inspecteur** (aperçu Markdown, sortie, détails), le **journal** repliable et le **pied de page** (progression, ETA, rapport) sont implémentés. **Thème clair / sombre** : boutons **« Sombre »** / **« Clair »** dans la barre de titre ; préférence enregistrée dans un fichier ``settings.json`` (Linux : ``~/.config/markdown-converter/`` ; macOS : ``~/Library/Application Support/Markdown Converter/`` ; Windows : ``%APPDATA%\Markdown Converter\``). Variable optionnelle ``MARKDOWN_CONVERTER_SETTINGS_DIR`` pour forcer le dossier de configuration (tests, portable). La suite (persistance file et dossier de sortie, exposition des moteurs, etc.) est suivie dans le projet Linear [Refonte interface (PySide6)](https://linear.app/dantes/project/refonte-interface-pyside6-a49711c9504d) ([PLO-29](https://linear.app/dantes/issue/PLO-29), [PLO-40](https://linear.app/dantes/issue/PLO-40), …). Si PySide6 n'est pas installé alors que `MARKDOWN_CONVERTER_UI=qt`, l'application affiche un message et retombe automatiquement sur Tkinter.
 
 #### Ajouter un moteur de conversion
 
