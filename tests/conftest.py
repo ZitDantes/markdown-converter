@@ -40,6 +40,17 @@ def _isolated_log_dir(tmp_path_factory, monkeypatch):
     return log_dir
 
 
+@pytest.fixture(autouse=True)
+def _isolated_markdown_converter_settings_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    """Évite que l'UI Qt relise le ``settings.json`` réel de l'utilisateur (PLO-29)."""
+    d = tmp_path / "markdown_converter_settings"
+    d.mkdir()
+    monkeypatch.setenv("MARKDOWN_CONVERTER_SETTINGS_DIR", str(d))
+    return d
+
+
 @pytest.fixture
 def fixtures_dir() -> Path:
     """Chemin du dossier ``tests/fixtures/`` (documents minimaux versionnés)."""

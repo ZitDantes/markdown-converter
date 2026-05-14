@@ -10,8 +10,8 @@ ainsi que le bouton **Vider** sur la file. PLO-37 livre le **journal** bas
 globale, compteurs, ETA, rapport) et la **titlebar** (pastille Pandoc, bouton
 thème). PLO-27 ajoute le **glisser-déposer** natif sur la file
 (overlay pointillé). PLO-28 livre le **thème clair / sombre** persistant
-(``ui_qt_settings`` / ``ui_qt_theme``). D'autres tickets complètent la persistance
-file (PLO-29), etc.
+(``ui_qt_settings`` / ``ui_qt_theme``). **PLO-29** : persistance de la **file**
+et du **dossier de sortie** dans le même ``settings.json``.
 
 Architecture cible (cf. ``design_handoff_ui_refonte/README.md``) ::
 
@@ -252,6 +252,7 @@ class MarkdownConverterQtApp:
         self._last_summary: Any = None  # ``ConversionSummary`` après un lot réussi
         self._batch_start_monotonic: float | None = None
         self._qt_theme: str = "light"
+        self._session_persist_timer: object | None = None
 
     def build(self) -> QMainWindow:
         """Construit et retourne la ``QMainWindow``. Ne l'affiche pas."""
@@ -358,6 +359,9 @@ class MarkdownConverterQtApp:
         titlebar_parts.theme_placeholder.clicked.connect(self._on_theme_button_clicked)
         self._sync_theme_button()
 
+        self._restore_qt_session()
+        self._install_session_persistence(window)
+
         return window
 
     def _sync_theme_button(self) -> None:
@@ -390,21 +394,70 @@ class MarkdownConverterQtApp:
             apply_qt_theme(app_inst, self._window, theme)
         self._sync_theme_button()
 
-    def set_output_dir(self, output_dir: Path) -> None:
-        """Sélectionne le dossier de sortie après validation (existence + écriture)."""
-        resolved = output_dir.resolve()
+    def set_output_dir(self, output_dir: Path, *, quiet: bool = False) -> None:
+        """Sélectionne le dossier de sortie après validation (existence + écriture).
+
+        ``quiet=True`` : au redémarrage, un chemin invalide est ignoré sans message
+        d'erreur dans le bandeau.
+        """
+        resolved = output_dir.expanduser().resolve()
         ok, err = _validate_output_dir(resolved)
         if self.output_banner_parts is not None:
             if not ok:
-                self.output_banner_parts.error_label.setText(err)
-                self.output_banner_parts.error_label.setVisible(True)
-                self.output_banner_parts.error_label.show()
+                if not quiet:
+                    self.output_banner_parts.error_label.setText(err)
+                    self.output_banner_parts.error_label.setVisible(True)
+                    self.output_banner_parts.error_label.show()
                 return
             self.output_banner_parts.error_label.clear()
             self.output_banner_parts.error_label.setVisible(False)
             self.output_banner_parts.label.setText(f"Dossier de sortie : {resolved}")
         self.output_dir = resolved
         self._refresh_convert_button_state()
+        self._flush_session_to_settings()
+
+    def _restore_qt_session(self) -> None:
+        """Recharge file et dossier de sortie depuis ``settings.json`` (chemins encore valides)."""
+        from ui_qt_settings import load_output_dir_str, load_source_paths
+
+        if self.file_view_parts is not None:
+            raw = load_source_paths()
+            if raw:
+                add_paths_to_model(self.file_view_parts.model, [Path(s) for s in raw])
+        out_str = load_output_dir_str()
+        if out_str:
+            self.set_output_dir(Path(out_str), quiet=True)
+
+    def _install_session_persistence(self, window: object) -> None:
+        """Sauvegarde différée de la file et du dossier de sortie (évite I/O par ligne)."""
+        from PySide6.QtCore import QTimer
+
+        if self.file_view_parts is None:
+            return
+        model = self.file_view_parts.model
+        timer = QTimer(window)
+        timer.setSingleShot(True)
+        timer.timeout.connect(self._flush_session_to_settings)
+        self._session_persist_timer = timer
+        model.rowsInserted.connect(self._schedule_session_persist)
+        model.rowsRemoved.connect(self._schedule_session_persist)
+        model.modelReset.connect(self._schedule_session_persist)
+        model.layoutChanged.connect(self._schedule_session_persist)
+
+    def _schedule_session_persist(self, *_: object) -> None:
+        t = self._session_persist_timer
+        if t is None:
+            return
+        t.stop()
+        t.start(400)
+
+    def _flush_session_to_settings(self) -> None:
+        if self.file_view_parts is None:
+            return
+        from ui_qt_settings import save_session_paths_and_output
+
+        paths = [rec.source_path for rec in self.file_view_parts.model.records()]
+        save_session_paths_and_output(paths, self.output_dir)
 
     def _on_clear_file_list(self) -> None:
         if self.file_view_parts is None or self.toolbar_parts is None:
