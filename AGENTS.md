@@ -38,7 +38,7 @@ Au tout début de chaque **nouvelle** session, **avant toute autre action**, l'a
 4. **Fichiers modifiés non commités** s'il y en a (sinon l'indiquer explicitement).
 5. **Ruff** : résultat de `ruff check .` — **propre** ou **erreurs en attente** (exécution en début de session pour refléter l'état réel ; si la commande ne peut pas être lancée, l'indiquer clairement).
 
-**Contraintes de forme** : chaque point — **cinq lignes maximum** ; le bloc se termine par la question ouverte : **« Sur quoi travaille-t-on aujourd'hui ? »**
+**Contraintes de forme** : chaque point — **cinq lignes maximum** ; le bloc se termine par la question ouverte : **« Sur quoi travaille-t-on maintenant ? »**
 
 **Portée temporelle** : ce rituel s'applique **uniquement** au **premier** message d'une **nouvelle** session. L'agent **ne le répète pas** sur les messages suivants de la même session (y compris après reprise de contexte ou changement de sujet dans le fil).
 
