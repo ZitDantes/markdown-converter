@@ -76,3 +76,53 @@ def test_save_theme_merges_existing_json(monkeypatch: pytest.MonkeyPatch, tmp_pa
     data = json.loads(p.read_text(encoding="utf-8"))
     assert data["future_key"] == 42
     assert data["theme"] == "dark"
+
+
+def test_session_paths_roundtrip_and_cap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import ui_qt_settings as m
+
+    p = tmp_path / "settings.json"
+    monkeypatch.setattr(m, "settings_path", lambda: p)
+    many = [tmp_path / f"f{i}.txt" for i in range(m.SESSION_SOURCE_PATHS_LIMIT + 50)]
+    m.save_session_paths_and_output(many, tmp_path)
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert len(data["source_paths"]) == m.SESSION_SOURCE_PATHS_LIMIT
+    loaded = m.load_source_paths()
+    assert len(loaded) == m.SESSION_SOURCE_PATHS_LIMIT
+
+
+def test_session_merges_theme(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import ui_qt_settings as m
+
+    p = tmp_path / "settings.json"
+    monkeypatch.setattr(m, "settings_path", lambda: p)
+    m.save_theme("dark")
+    m.save_session_paths_and_output([tmp_path / "a.docx"], tmp_path)
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data["theme"] == "dark"
+    assert data["output_dir"] == str(tmp_path.resolve())
+
+
+def test_load_source_paths_ignores_garbage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import ui_qt_settings as m
+
+    p = tmp_path / "settings.json"
+    monkeypatch.setattr(m, "settings_path", lambda: p)
+    p.write_text(
+        '{"source_paths": ["/ok.txt", 3, "", "  /other.pdf  "]}\n',
+        encoding="utf-8",
+    )
+    assert m.load_source_paths() == ["/ok.txt", "/other.pdf"]
+
+
+def test_save_session_drops_output_dir_when_none(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import ui_qt_settings as m
+
+    p = tmp_path / "settings.json"
+    monkeypatch.setattr(m, "settings_path", lambda: p)
+    m.save_session_paths_and_output([], tmp_path)
+    m.save_session_paths_and_output([], None)
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert "output_dir" not in data
