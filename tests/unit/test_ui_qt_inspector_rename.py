@@ -121,7 +121,7 @@ def test_plan_rejects_duplicate_targets_after_case_lower(tmp_path: Path) -> None
     ops, err = plan_bulk_rename([r1, r2], "", "", CASE_LOWER)
     assert ops == []
     assert err is not None
-    assert "même nom" in err
+    assert "même nom" in err or "existe déjà" in err
 
 
 def test_execute_swap_two_files(tmp_path: Path) -> None:

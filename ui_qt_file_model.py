@@ -14,7 +14,12 @@ from pathlib import Path
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor
 
-from converter import ConversionStatus, FileConversionRecord
+from converter import FileConversionRecord
+from ui_conversion_display import (
+    conversion_status_label_fr,
+    file_byte_size,
+    format_byte_size,
+)
 from utils import normalize_extension
 
 # Tokens « Couleurs par format » — design_handoff_ui_refonte/README.md
@@ -56,54 +61,6 @@ def _format_accent_hex_for_path(path: Path) -> str:
 def _format_monogram(path: Path) -> str:
     ext = normalize_extension(path).lstrip(".")
     return (ext[:4] or "?").upper()
-
-
-def _format_file_size(num_bytes: int) -> str:
-    if num_bytes < 0:
-        return "—"
-    if num_bytes == 0:
-        return "0 o"
-    units = ("o", "Ko", "Mo", "Go", "To")
-    size = float(num_bytes)
-    u = 0
-    while size >= 1024.0 and u < len(units) - 1:
-        size /= 1024.0
-        u += 1
-    if u == 0:
-        return f"{int(size)} {units[u]}"
-    text = f"{size:.1f}".rstrip("0").rstrip(".")
-    return f"{text} {units[u]}"
-
-
-def _file_size_bytes(path: Path) -> int:
-    try:
-        return path.stat().st_size
-    except OSError:
-        return 0
-
-
-def _status_label_fr(status: ConversionStatus) -> str:
-    mapping: dict[ConversionStatus, str] = {
-        ConversionStatus.SUCCESS: "OK",
-        ConversionStatus.SUCCESS_REVIEW: "OK · relire",
-        ConversionStatus.SUCCESS_FALLBACK: "OK · secours",
-        ConversionStatus.ERROR: "Erreur",
-        ConversionStatus.UNSUPPORTED: "Non pris en charge",
-        ConversionStatus.EMPTY: "Vide",
-        ConversionStatus.PROCESSING: "En cours",
-        ConversionStatus.QUEUED: "En attente",
-    }
-    return mapping.get(status, status.value)
-
-
-def conversion_status_label_fr(status: ConversionStatus) -> str:
-    """Libellé court du statut en français (table, inspecteur)."""
-    return _status_label_fr(status)
-
-
-def format_source_file_size(path: Path) -> str:
-    """Taille du fichier source pour affichage dans l'UI (o, Ko, …)."""
-    return _format_file_size(_file_size_bytes(path))
 
 
 def _progress_display(progress_percent: float) -> str:
@@ -188,7 +145,7 @@ class ConversionFileTableModel(QAbstractTableModel):
             if col == _COL_NAME:
                 return rec.source_path.name
             if col == _COL_SIZE:
-                return _format_file_size(_file_size_bytes(rec.source_path))
+                return format_byte_size(file_byte_size(rec.source_path))
             if col == _COL_STATUS:
                 return conversion_status_label_fr(rec.status)
             if col == _COL_PROGRESS:
@@ -221,7 +178,7 @@ class ConversionFileTableModel(QAbstractTableModel):
             if column == _COL_NAME:
                 return p.name.lower()
             if column == _COL_SIZE:
-                return _file_size_bytes(p)
+                return file_byte_size(p)
             if column == _COL_STATUS:
                 return rec.status.value
             if column == _COL_PROGRESS:

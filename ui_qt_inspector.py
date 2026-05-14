@@ -49,11 +49,11 @@ from PySide6.QtWidgets import (
 )
 
 from converter import ConversionStatus, FileConversionRecord
-from ui_qt_file_model import (
-    ConversionFileTableModel,
+from ui_conversion_display import (
     conversion_status_label_fr,
     format_source_file_size,
 )
+from ui_qt_file_model import ConversionFileTableModel
 from ui_qt_inspector_data import parse_front_matter
 from ui_qt_inspector_rename import (
     CASE_LOWER,
