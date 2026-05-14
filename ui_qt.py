@@ -6,9 +6,10 @@ d'environnement ``MARKDOWN_CONVERTER_UI`` vaut ``qt``. PLO-34 a posé le
 squelette ; PLO-35 a livré la file et le worker ; PLO-36 garnit la **toolbar**
 (chips, recherche) et renforce le **bandeau de sortie** (validation écriture)
 ainsi que le bouton **Vider** sur la file. PLO-37 livre le **journal** bas
-(filtres niveau, lien vers ``run.log``). Le rendu reste volontairement sobre
-(mockup fonctionnel) ; le polish visuel arrive avec PLO-28 et les tickets
-suivants.
+(filtres niveau, lien vers ``run.log``). PLO-39 enrichit le **footer** (progress
+globale, compteurs, ETA, rapport) et la **titlebar** (pastille Pandoc, embase
+thème sans logique). Le rendu reste volontairement sobre (mockup fonctionnel) ;
+le polish visuel arrive avec PLO-28 et les tickets suivants.
 
 Architecture cible (cf. ``design_handoff_ui_refonte/README.md``) ::
 
@@ -32,9 +33,10 @@ suivants de les remplir sans toucher au layout global.
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QThread
@@ -42,6 +44,7 @@ if TYPE_CHECKING:
         QLabel,
         QLineEdit,
         QMainWindow,
+        QProgressBar,
         QPushButton,
         QSplitter,
         QTableView,
@@ -60,6 +63,82 @@ DEFAULT_WIDTH = 1100
 DEFAULT_HEIGHT = 720
 INSPECTOR_INITIAL_WIDTH = 380
 FILE_ROW_HEIGHT = 50  # cf. design_handoff_ui_refonte/README.md
+
+
+def _errors_fr(n: int) -> str:
+    if n <= 0:
+        return "0 erreur"
+    if n == 1:
+        return "1 erreur"
+    return f"{n} erreurs"
+
+
+def _format_eta_compact(seconds: int) -> str:
+    if seconds <= 0:
+        return "ETA —"
+    if seconds < 60:
+        return f"ETA {seconds} s"
+    m, s = divmod(seconds, 60)
+    if m < 60:
+        if s:
+            return f"ETA {m} min {s} s"
+        return f"ETA {m} min"
+    h, m = divmod(m, 60)
+    return f"ETA {h} h {m} min"
+
+
+def _live_done_from_global_percent(percent: float, total: int) -> int:
+    """Nombre de fichiers terminés déduit du pourcentage global du lot (0-1)."""
+    if total <= 0:
+        return 0
+    return min(total, max(0, round(percent * total)))
+
+
+def _summary_has_markdown_output(summary: object) -> bool:
+    """Vrai si au moins un fichier ``.md`` a été produit avec un statut de succès."""
+    from converter import SUCCESS_STATUSES, ConversionSummary
+
+    if not isinstance(summary, ConversionSummary):
+        return False
+    for r in summary.records:
+        if (
+            r.status in SUCCESS_STATUSES
+            and r.output_path is not None
+            and r.output_path.suffix.lower() == ".md"
+        ):
+            return True
+    return False
+
+
+def _install_worker_ui_sink(app: MarkdownConverterQtApp, parent: QWidget) -> object:
+    """Pont ``QObject`` : les signaux du worker **doivent** aboutir sur le thread GUI.
+
+    ``MarkdownConverterQtApp`` n'est pas un ``QObject`` ; connecter des slots Python
+    directs au worker peut conduire Qt à invoquer le slot sur le thread du worker
+    (DirectConnection implicite), ce qui corrompt ``QTableView`` / ``QTextEdit`` et
+    provoque des segfaults (surtout avec des lots bavards en logs, ex. ``.txt``).
+    """
+    from PySide6.QtCore import QObject, Slot
+
+    class _WorkerUISink(QObject):
+        @Slot(str, str)
+        def on_log(self, level: str, message: str) -> None:
+            if app.journal_panel is not None:
+                app.journal_panel.append_log(level, message)
+
+        @Slot(int, int, str, float)
+        def on_progress(self, index: int, total: int, label: str, percent: float) -> None:
+            app._on_worker_progress(index, total, label, percent)
+
+        @Slot(object)
+        def on_finished(self, summary: object) -> None:
+            app._on_worker_finished(summary)
+
+        @Slot(str)
+        def on_failed(self, error_text: str) -> None:
+            app._on_worker_failed(error_text)
+
+    return _WorkerUISink(parent)
 
 
 def _validate_output_dir(path: Path) -> tuple[bool, str]:
@@ -121,12 +200,25 @@ class OutputBannerParts:
 
 
 @dataclass
-class FooterParts:
-    """Sous-widgets du footer minimal (PLO-35) ; bouton journal (PLO-37)."""
+class TitlebarParts:
+    """Titlebar (PLO-39) : titre produit, pastille Pandoc, embase thème (PLO-28)."""
 
-    journal_toggle_button: QPushButton
-    convert_button: QPushButton
+    title_label: QLabel
+    pandoc_badge: QLabel
+    theme_placeholder: QPushButton
+
+
+@dataclass
+class FooterParts:
+    """Footer : progression globale, compteurs, ETA, journal, rapport, convertir (PLO-35-39)."""
+
+    progress_bar: QProgressBar
+    counters_label: QLabel
+    eta_label: QLabel
     status_label: QLabel
+    journal_toggle_button: QPushButton
+    report_button: QPushButton
+    convert_button: QPushButton
 
 
 class MarkdownConverterQtApp:
@@ -148,11 +240,15 @@ class MarkdownConverterQtApp:
         self.toolbar_parts: ToolbarParts | None = None
         self.output_banner_parts: OutputBannerParts | None = None
         self.footer_parts: FooterParts | None = None
+        self.titlebar_parts: TitlebarParts | None = None
         self.journal_panel: ConversionJournalPanel | None = None
         self.inspector_panel: MarkdownInspectorPanel | None = None
         self.output_dir: Path | None = None
         self._worker: ConversionWorker | None = None
         self._worker_thread: QThread | None = None
+        self._worker_ui_sink: object | None = None
+        self._last_summary: Any = None  # ``ConversionSummary`` après un lot réussi
+        self._batch_start_monotonic: float | None = None
 
     def build(self) -> QMainWindow:
         """Construit et retourne la ``QMainWindow``. Ne l'affiche pas."""
@@ -176,7 +272,7 @@ class MarkdownConverterQtApp:
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        titlebar = _named_placeholder("titlebar", "Markdown Converter")
+        titlebar, titlebar_parts = _build_titlebar()
         output_banner, output_banner_parts = _build_output_banner()
 
         central = QSplitter(Qt.Orientation.Horizontal, root)
@@ -222,11 +318,13 @@ class MarkdownConverterQtApp:
         self.toolbar_parts = toolbar_parts
         self.output_banner_parts = output_banner_parts
         self.footer_parts = footer_parts
+        self.titlebar_parts = titlebar_parts
         self.journal_panel = journal_panel
         self.inspector_panel = inspector
 
         output_banner_parts.choose_button.clicked.connect(self._on_choose_output_dir)
         footer_parts.journal_toggle_button.toggled.connect(journal_panel.setVisible)
+        footer_parts.report_button.clicked.connect(self._on_report_clicked)
         footer_parts.convert_button.clicked.connect(self._on_convert_clicked)
         footer_parts.convert_button.setEnabled(False)
         file_view_parts.clear_button.clicked.connect(self._on_clear_file_list)
@@ -242,6 +340,8 @@ class MarkdownConverterQtApp:
         inspector.set_file_model(file_view_parts.model)
         # Si le modèle se réinitialise (fin de lot, vider…), on remet l'aperçu à zéro.
         file_view_parts.model.modelReset.connect(self._reset_inspector_selection)
+
+        self._worker_ui_sink = _install_worker_ui_sink(self, window)
 
         return window
 
@@ -280,6 +380,10 @@ class MarkdownConverterQtApp:
         if reply != QMessageBox.StandardButton.Yes:
             return
         model.clear()
+        self._last_summary = None
+        if self.footer_parts is not None:
+            self.footer_parts.report_button.setVisible(False)
+            self.footer_parts.progress_bar.setValue(0)
         self.toolbar_parts.search_input.blockSignals(True)
         self.toolbar_parts.search_input.clear()
         self.toolbar_parts.search_input.blockSignals(False)
@@ -289,6 +393,7 @@ class MarkdownConverterQtApp:
             btn.blockSignals(False)
         self.file_view_parts.proxy.set_active_extensions(set())
         self.file_view_parts.proxy.set_name_filter("")
+        self._update_footer_idle_preview()
 
     def _refresh_convert_button_state(self, *_: object) -> None:
         if self.footer_parts is None or self.file_view_parts is None:
@@ -296,6 +401,32 @@ class MarkdownConverterQtApp:
         ready = self.output_dir is not None and bool(self.file_view_parts.model.records())
         running = self._worker_thread is not None
         self.footer_parts.convert_button.setEnabled(ready and not running)
+        if not running and self._last_summary is None:
+            self._update_footer_idle_preview()
+
+    def _update_footer_idle_preview(self) -> None:
+        """Compteurs au repos (hors conversion) : 0 terminés sur la taille de la file."""
+        if self.footer_parts is None or self.file_view_parts is None:
+            return
+        if self._worker_thread is not None:
+            return
+        n = len(self.file_view_parts.model.records())
+        self.footer_parts.counters_label.setText(f"0 / {n} · {_errors_fr(0)}")
+        self.footer_parts.eta_label.setText("ETA —")
+
+    def _on_report_clicked(self) -> None:
+        if self._last_summary is None or self._window is None:
+            return
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        from converter import ConversionSummary
+        from report import write_report
+
+        if not isinstance(self._last_summary, ConversionSummary):
+            return
+        path = write_report(self._last_summary)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
 
     def _on_choose_output_dir(self) -> None:
         from PySide6.QtWidgets import QFileDialog
@@ -315,6 +446,18 @@ class MarkdownConverterQtApp:
         if not paths:
             return
 
+        sink = self._worker_ui_sink
+        if sink is None:
+            return
+
+        self._last_summary = None
+        self.footer_parts.report_button.setVisible(False)
+        self._batch_start_monotonic = time.monotonic()
+        self.footer_parts.progress_bar.setValue(0)
+        self.footer_parts.eta_label.setText("ETA —")
+        n = len(paths)
+        self.footer_parts.counters_label.setText(f"0 / {n} · {_errors_fr(0)}")
+
         worker = ConversionWorker(
             explicit_files=paths,
             directory_roots=[],
@@ -324,14 +467,10 @@ class MarkdownConverterQtApp:
         thread = QThread()
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        if self.journal_panel is not None:
-            worker.log.connect(
-                self.journal_panel.append_log,
-                Qt.ConnectionType.QueuedConnection,
-            )
-        worker.progress.connect(self._on_worker_progress)
-        worker.finished.connect(self._on_worker_finished)
-        worker.failed.connect(self._on_worker_failed)
+        worker.log.connect(sink.on_log, Qt.ConnectionType.QueuedConnection)
+        worker.progress.connect(sink.on_progress, Qt.ConnectionType.QueuedConnection)
+        worker.finished.connect(sink.on_finished, Qt.ConnectionType.QueuedConnection)
+        worker.failed.connect(sink.on_failed, Qt.ConnectionType.QueuedConnection)
         worker.finished.connect(thread.quit)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
@@ -358,27 +497,55 @@ class MarkdownConverterQtApp:
         if rec.status == ConversionStatus.QUEUED:
             rec.status = ConversionStatus.PROCESSING
         self.file_view_parts.model.refresh_row(row)
-        self.footer_parts.status_label.setText(
-            f"Conversion en cours… {label} ({round(percent * 100)} %)"
-        )
+
+        pct_int = round(max(0.0, min(1.0, percent)) * 100)
+        self.footer_parts.progress_bar.setValue(pct_int)
+
+        done_live = _live_done_from_global_percent(percent, total)
+        err_live = sum(1 for r in records if r.status == ConversionStatus.ERROR)
+        self.footer_parts.counters_label.setText(f"{done_live} / {total} · {_errors_fr(err_live)}")
+
+        if self._batch_start_monotonic is not None and done_live > 0 and percent < 1.0:
+            elapsed = time.monotonic() - self._batch_start_monotonic
+            avg = elapsed / done_live
+            rem = total - done_live
+            eta_sec = max(0, int(avg * rem))
+            self.footer_parts.eta_label.setText(_format_eta_compact(eta_sec))
+        elif percent >= 1.0 - 1e-9:
+            self.footer_parts.eta_label.setText("ETA —")
+
+        self.footer_parts.status_label.setText(f"« {label} » — {pct_int} %")
 
     def _on_worker_finished(self, summary: object) -> None:
         if self.file_view_parts is None or self.footer_parts is None:
             return
-        from converter import ConversionStatus, ConversionSummary
+        from converter import SUCCESS_STATUSES, ConversionStatus, ConversionSummary
 
         if not isinstance(summary, ConversionSummary):
             return
+        self._last_summary = summary
         self.file_view_parts.model.set_records(list(summary.records))
         errors = sum(1 for r in summary.records if r.status == ConversionStatus.ERROR)
-        self.footer_parts.status_label.setText(
-            f"Terminé · {len(summary.records)} fichier(s), {errors} erreur(s)."
-        )
+        n = len(summary.records)
+
+        ok = sum(1 for r in summary.records if r.status in SUCCESS_STATUSES)
+        self.footer_parts.progress_bar.setValue(100)
+        self.footer_parts.counters_label.setText(f"{ok} / {n} · {_errors_fr(errors)}")
+        self.footer_parts.eta_label.setText("ETA —")
+        self.footer_parts.status_label.setText(f"Terminé · {n} fichier(s), {errors} erreur(s).")
+        self.footer_parts.report_button.setVisible(_summary_has_markdown_output(summary))
         self._refresh_convert_button_state()
 
     def _on_worker_failed(self, error_text: str) -> None:
         if self.footer_parts is None:
             return
+        self._last_summary = None
+        self.footer_parts.report_button.setVisible(False)
+        self.footer_parts.progress_bar.setValue(0)
+        self.footer_parts.eta_label.setText("ETA —")
+        if self.file_view_parts is not None:
+            n = len(self.file_view_parts.model.records())
+            self.footer_parts.counters_label.setText(f"0 / {n} · {_errors_fr(0)}")
         first_line = error_text.splitlines()[0] if error_text else "Échec de la conversion."
         self.footer_parts.status_label.setText(f"Échec : {first_line}")
         self._refresh_convert_button_state()
@@ -391,22 +558,6 @@ class MarkdownConverterQtApp:
     def _reset_inspector_selection(self) -> None:
         if self.inspector_panel is not None:
             self.inspector_panel.set_record(None)
-
-
-def _named_placeholder(name: str, text: str) -> QWidget:
-    """Crée un placeholder visuel discret avec un ``objectName`` pour le retrouver."""
-    from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel
-
-    frame = QFrame()
-    frame.setObjectName(name)
-    frame.setFrameShape(QFrame.Shape.StyledPanel)
-    layout = QHBoxLayout(frame)
-    layout.setContentsMargins(12, 8, 12, 8)
-    label = QLabel(text, frame)
-    label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-    layout.addWidget(label, stretch=1)
-    return frame
 
 
 def _build_output_banner() -> tuple[QWidget, OutputBannerParts]:
@@ -444,34 +595,129 @@ def _build_output_banner() -> tuple[QWidget, OutputBannerParts]:
     return frame, OutputBannerParts(label=label, choose_button=button, error_label=error_label)
 
 
-def _build_footer() -> tuple[QWidget, FooterParts]:
-    """Footer minimal (PLO-35) : statut + journal (PLO-37) + **Convertir**."""
+def _build_titlebar() -> tuple[QWidget, TitlebarParts]:
+    """Titlebar : titre, pastille Pandoc, embase thème (sans logique, PLO-28)."""
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
+
+    from engines.pandoc_engine import PandocEngine
+
+    frame = QFrame()
+    frame.setObjectName("titlebar")
+    frame.setFrameShape(QFrame.Shape.StyledPanel)
+    layout = QHBoxLayout(frame)
+    layout.setContentsMargins(12, 8, 12, 8)
+    layout.setSpacing(12)
+
+    title = QLabel(WINDOW_TITLE, frame)
+    title.setObjectName("titlebar_title")
+    title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+    layout.addWidget(title)
+    layout.addStretch(1)
+
+    pandoc = QLabel(frame)
+    pandoc.setObjectName("titlebar_pandoc_badge")
+    pandoc.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+    if PandocEngine.is_available():
+        pandoc.setText("Pandoc actif")
+        pandoc.setStyleSheet("color: #0a6e0a; font-weight: 600;")
+        exe = PandocEngine.executable_path()
+        pandoc.setToolTip(
+            f"Pandoc est disponible sur cette machine.\nExécutable : {exe}"
+            if exe
+            else "Pandoc est disponible sur cette machine."
+        )
+    else:
+        pandoc.setText("Pandoc non détecté")
+        pandoc.setStyleSheet("color: #666666; font-weight: 600;")
+        pandoc.setToolTip(
+            "Pandoc n'est pas installé ou absent du PATH. "
+            "Le secours Pandoc ne sera pas proposé. "
+            "Voir https://pandoc.org/installing.html"
+        )
+
+    theme = QPushButton("Thème", frame)
+    theme.setObjectName("titlebar_theme_placeholder")
+    theme.setEnabled(False)
+    theme.setFlat(True)
+    theme.setToolTip("Basculer clair / sombre — bientôt disponible (PLO-28).")
+
+    layout.addWidget(pandoc)
+    layout.addWidget(theme)
+
+    return frame, TitlebarParts(title_label=title, pandoc_badge=pandoc, theme_placeholder=theme)
+
+
+def _build_footer() -> tuple[QWidget, FooterParts]:
+    """Footer : progression globale, compteurs, ETA, journal, rapport, convertir (PLO-39)."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import (
+        QFrame,
+        QHBoxLayout,
+        QLabel,
+        QProgressBar,
+        QPushButton,
+        QVBoxLayout,
+    )
 
     frame = QFrame()
     frame.setObjectName("footer")
     frame.setFrameShape(QFrame.Shape.StyledPanel)
-    layout = QHBoxLayout(frame)
-    layout.setContentsMargins(12, 8, 12, 8)
-    layout.setSpacing(8)
+    outer = QVBoxLayout(frame)
+    outer.setContentsMargins(12, 8, 12, 8)
+    outer.setSpacing(6)
+
+    progress = QProgressBar(frame)
+    progress.setObjectName("footer_progress")
+    progress.setRange(0, 100)
+    progress.setValue(0)
+    progress.setTextVisible(True)
+    outer.addWidget(progress)
+
+    row = QHBoxLayout()
+    row.setSpacing(8)
+    counters = QLabel("0 / 0 · 0 erreur", frame)
+    counters.setObjectName("footer_counters")
+    counters.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+    eta = QLabel("ETA —", frame)
+    eta.setObjectName("footer_eta")
+    eta.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+    eta.setMinimumWidth(100)
     status = QLabel("Prêt.", frame)
     status.setObjectName("footer_status")
     status.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
     journal_toggle = QPushButton("Journal", frame)
     journal_toggle.setObjectName("footer_journal_toggle")
     journal_toggle.setCheckable(True)
     journal_toggle.setToolTip("Afficher ou masquer le journal de conversion.")
+
+    report = QPushButton("Rapport", frame)
+    report.setObjectName("footer_report")
+    report.setVisible(False)
+    report.setToolTip("Ouvrir le rapport Markdown du dernier lot converti.")
+
     convert = QPushButton("Convertir", frame)
     convert.setObjectName("footer_convert")
     convert.setDefault(True)
-    layout.addWidget(status, stretch=1)
-    layout.addWidget(journal_toggle)
-    layout.addWidget(convert)
+
+    row.addWidget(counters)
+    row.addWidget(eta)
+    row.addWidget(status, stretch=1)
+    row.addWidget(journal_toggle)
+    row.addWidget(report)
+    row.addWidget(convert)
+    outer.addLayout(row)
+
     return frame, FooterParts(
-        journal_toggle_button=journal_toggle,
-        convert_button=convert,
+        progress_bar=progress,
+        counters_label=counters,
+        eta_label=eta,
         status_label=status,
+        journal_toggle_button=journal_toggle,
+        report_button=report,
+        convert_button=convert,
     )
 
 
