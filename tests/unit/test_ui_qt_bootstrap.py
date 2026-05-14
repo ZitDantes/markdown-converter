@@ -30,6 +30,7 @@ def test_import_ui_qt_without_pyside6_does_not_fail() -> None:
     assert hasattr(module, "MarkdownConverterQtApp")
     assert hasattr(module, "QtZones")
     assert hasattr(module, "FileViewParts")
+    assert hasattr(module, "ConversionModeParts")
     assert hasattr(module, "add_paths_to_model")
     assert hasattr(module, "run_app")
 
@@ -298,3 +299,16 @@ def test_vider_cancel_keeps_files(qt_app: object, tmp_path: object, monkeypatch:
     add_paths_to_model(app.file_view_parts.model, [p])
     app._on_clear_file_list()
     assert len(app.file_view_parts.model.records()) == 1
+
+
+def test_conversion_mode_radios_labels(qt_app: object) -> None:
+    from ui_qt import MarkdownConverterQtApp
+
+    app = MarkdownConverterQtApp()
+    app.build()
+    assert app.conversion_mode_parts is not None
+    std = app.conversion_mode_parts.standard_radio
+    strict = app.conversion_mode_parts.strict_radio
+    assert std.isChecked() is True
+    assert "Standard (recommandé)" in std.text()
+    assert strict.text() == "Strict"

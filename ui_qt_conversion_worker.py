@@ -6,6 +6,7 @@ Conception :
 - Le worker est un ``QObject`` qui s'auto-suffit ; il est destiné à être déplacé
   dans un ``QThread`` via ``moveToThread`` et démarré par le signal ``started``
   du thread connecté à ``run()``.
+- ``use_conversion_fallback`` (défaut ``True``) : transmis à ``convert_files`` (PLO-40).
 - Les callbacks ``on_log`` / ``on_progress`` de ``convert_files`` sont
   **transformés en signaux Qt** : l'UI ne reçoit donc jamais d'appel direct
   depuis le thread worker, ce qui respecte le modèle de threading Qt et évite
@@ -44,12 +45,14 @@ class ConversionWorker(QObject):
         output_dir: Path,
         *,
         keep_output_in_memory: bool = True,
+        use_conversion_fallback: bool = True,
     ) -> None:
         super().__init__()
         self._explicit_files = list(explicit_files)
         self._directory_roots = list(directory_roots)
         self._output_dir = output_dir
         self._keep_output_in_memory = keep_output_in_memory
+        self._use_conversion_fallback = use_conversion_fallback
 
     def run(self) -> None:
         """Slot à connecter à ``QThread.started``. Exécution synchrone dans le thread."""
@@ -61,6 +64,7 @@ class ConversionWorker(QObject):
                 on_log=self._emit_log,
                 on_progress=self._emit_progress,
                 keep_output_in_memory=self._keep_output_in_memory,
+                use_conversion_fallback=self._use_conversion_fallback,
             )
         except Exception as exc:  # noqa: BLE001 — on relaie texte uniquement
             self.failed.emit(f"{type(exc).__name__} : {exc}\n{traceback.format_exc()}")

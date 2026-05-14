@@ -11,7 +11,9 @@ globale, compteurs, ETA, rapport) et la **titlebar** (pastille Pandoc, bouton
 thème). PLO-27 ajoute le **glisser-déposer** natif sur la file
 (overlay pointillé). PLO-28 livre le **thème clair / sombre** persistant
 (``ui_qt_settings`` / ``ui_qt_theme``). **PLO-29** : persistance de la **file**
-et du **dossier de sortie** dans le même ``settings.json``.
+et du **dossier de sortie** dans le même ``settings.json``. **PLO-40** : modes
+**Standard (recommandé)** / **Strict** (secours désactivable) branchés sur le
+worker.
 
 Architecture cible (cf. ``design_handoff_ui_refonte/README.md``) ::
 
@@ -48,6 +50,7 @@ if TYPE_CHECKING:
         QMainWindow,
         QProgressBar,
         QPushButton,
+        QRadioButton,
         QSplitter,
         QTableView,
         QWidget,
@@ -202,6 +205,14 @@ class OutputBannerParts:
 
 
 @dataclass
+class ConversionModeParts:
+    """Choix Standard / Strict (PLO-40), sans exposer les noms des moteurs."""
+
+    standard_radio: QRadioButton
+    strict_radio: QRadioButton
+
+
+@dataclass
 class TitlebarParts:
     """Titlebar (PLO-39) : titre produit, pastille Pandoc, embase thème (PLO-28)."""
 
@@ -253,6 +264,7 @@ class MarkdownConverterQtApp:
         self._batch_start_monotonic: float | None = None
         self._qt_theme: str = "light"
         self._session_persist_timer: object | None = None
+        self.conversion_mode_parts: ConversionModeParts | None = None
 
     def build(self) -> QMainWindow:
         """Construit et retourne la ``QMainWindow``. Ne l'affiche pas."""
@@ -282,6 +294,7 @@ class MarkdownConverterQtApp:
         central = QSplitter(Qt.Orientation.Horizontal, root)
         file_view, file_view_parts = _build_file_view()
         toolbar_area, toolbar_parts = _build_toolbar(file_view_parts.model)
+        conversion_mode_bar, conversion_mode_parts = _build_conversion_mode_bar(root)
         from ui_qt_inspector import MarkdownInspectorPanel
 
         inspector = MarkdownInspectorPanel()
@@ -299,7 +312,7 @@ class MarkdownConverterQtApp:
         journal_panel.setVisible(False)
         journal = journal_panel
 
-        for w in (titlebar, toolbar_area, output_banner):
+        for w in (titlebar, toolbar_area, conversion_mode_bar, output_banner):
             root_layout.addWidget(w)
         root_layout.addWidget(central, stretch=1)
         for w in (footer, journal):
@@ -325,6 +338,7 @@ class MarkdownConverterQtApp:
         self.titlebar_parts = titlebar_parts
         self.journal_panel = journal_panel
         self.inspector_panel = inspector
+        self.conversion_mode_parts = conversion_mode_parts
 
         output_banner_parts.choose_button.clicked.connect(self._on_choose_output_dir)
         footer_parts.journal_toggle_button.toggled.connect(journal_panel.setVisible)
@@ -556,11 +570,16 @@ class MarkdownConverterQtApp:
         n = len(paths)
         self.footer_parts.counters_label.setText(f"0 / {n} · {_errors_fr(0)}")
 
+        use_fb = (
+            self.conversion_mode_parts is None
+            or self.conversion_mode_parts.standard_radio.isChecked()
+        )
         worker = ConversionWorker(
             explicit_files=paths,
             directory_roots=[],
             output_dir=self.output_dir,
             keep_output_in_memory=True,
+            use_conversion_fallback=use_fb,
         )
         thread = QThread()
         worker.moveToThread(thread)
@@ -691,6 +710,49 @@ def _build_output_banner() -> tuple[QWidget, OutputBannerParts]:
     error_label.setStyleSheet("color: #b00020;")
     outer.addWidget(error_label)
     return frame, OutputBannerParts(label=label, choose_button=button, error_label=error_label)
+
+
+def _build_conversion_mode_bar(parent: object) -> tuple[QWidget, ConversionModeParts]:
+    """Bandeau Standard / Strict (PLO-40) : libellés produit, tooltips sans noms de bibliothèques."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QButtonGroup, QFrame, QHBoxLayout, QLabel, QRadioButton
+
+    frame = QFrame(parent)
+    frame.setObjectName("conversion_mode_bar")
+    frame.setFrameShape(QFrame.Shape.StyledPanel)
+    layout = QHBoxLayout(frame)
+    layout.setContentsMargins(12, 6, 12, 6)
+    layout.setSpacing(12)
+
+    title = QLabel("Mode de conversion", frame)
+    title.setObjectName("conversion_mode_title")
+    title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+    standard = QRadioButton("Standard (recommandé)", frame)
+    standard.setObjectName("conversion_mode_standard")
+    standard.setChecked(True)
+    standard.setToolTip(
+        "Par défaut : en cas d'échec ou de résultat vide, le programme peut tenter "
+        "une autre voie de conversion lorsque c'est possible sur cette machine."
+    )
+
+    strict = QRadioButton("Strict", frame)
+    strict.setObjectName("conversion_mode_strict")
+    strict.setToolTip(
+        "Une seule tentative par fichier : aucune méthode de secours. Les documents "
+        "difficiles peuvent échouer ou rester sans extrait exploitable."
+    )
+
+    mode_group = QButtonGroup(frame)
+    mode_group.setExclusive(True)
+    mode_group.addButton(standard)
+    mode_group.addButton(strict)
+
+    layout.addWidget(title)
+    layout.addWidget(standard)
+    layout.addWidget(strict)
+    layout.addStretch(1)
+    return frame, ConversionModeParts(standard_radio=standard, strict_radio=strict)
 
 
 def _build_titlebar() -> tuple[QWidget, TitlebarParts]:

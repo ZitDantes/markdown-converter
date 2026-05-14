@@ -1,6 +1,7 @@
 """
 Logique de conversion : orchestre les moteurs (MarkItDown en priorité,
-Pandoc en secours si disponible).
+Pandoc en secours si disponible). Le paramètre ``use_conversion_fallback`` de
+``convert_files`` permet de désactiver ce secours (mode « strict » côté UI).
 
 Toute l'intégration spécifique aux moteurs est isolée dans le package
 ``engines`` ; ce module se concentre sur l'orchestration du lot, le statut
@@ -270,6 +271,7 @@ def convert_files(
     on_progress: ProgressFn | None = None,
     *,
     keep_output_in_memory: bool = False,
+    use_conversion_fallback: bool = True,
 ) -> ConversionSummary:
     """
     Convertit une liste de fichiers et/ou l'arborescence de dossiers vers ``output_dir``.
@@ -290,6 +292,10 @@ def convert_files(
     avec précaution sur de gros lots (consommation mémoire ∝ taille du lot).
     Sinon le champ reste ``None``.
 
+    ``use_conversion_fallback`` (par défaut ``True``) : si ``False`` (mode
+    « strict » côté UI), le moteur secondaire n'est jamais invoqué ; un échec
+    ou un résultat vide du moteur principal reste terminal pour le fichier.
+
     Tous les messages sont également écrits dans le fichier de log persistant
     configuré par ``logging_setup.setup_logging()``.
     """
@@ -308,6 +314,7 @@ def convert_files(
             prog,
             started,
             keep_output_in_memory=keep_output_in_memory,
+            use_conversion_fallback=use_conversion_fallback,
         )
     finally:
         if callback_handler is not None:
@@ -322,12 +329,22 @@ def _run_conversion(
     started: datetime,
     *,
     keep_output_in_memory: bool,
+    use_conversion_fallback: bool,
 ) -> ConversionSummary:
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     pandoc_ok = PandocEngine.is_available()
-    if not pandoc_ok:
+    fallback: ConverterEngine | None = (
+        PandocEngine() if pandoc_ok and use_conversion_fallback else None
+    )
+
+    if not use_conversion_fallback:
+        logger.info(
+            "Mode strict : le secours automatique est désactivé. "
+            "Seul le moteur principal est utilisé pour chaque fichier."
+        )
+    elif not pandoc_ok:
         logger.info(
             "Note : Pandoc n'est pas installé ou absent du PATH. "
             "La conversion utilise **uniquement MarkItDown**, ce qui est le fonctionnement "
@@ -366,9 +383,8 @@ def _run_conversion(
         summary.finished_at = datetime.now()
         return summary
 
-    # Instanciation des moteurs (le primaire peut lever EngineNotAvailableError → propagé).
+    # Instanciation du moteur principal (peut lever EngineNotAvailableError → propagé).
     primary: ConverterEngine = MarkItDownEngine()
-    fallback: ConverterEngine | None = PandocEngine() if pandoc_ok else None
 
     for idx, src in enumerate(supported, start=1):
         label = src.name
