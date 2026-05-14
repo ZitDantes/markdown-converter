@@ -16,8 +16,9 @@ Vue d'ensemble :
 - L'onglet **Aperçu** affiche le Markdown produit (mémoire ou disque).
 - L'onglet **Sortie** affiche le chemin ``.md``, copie / dossier parent, et le
   **renommage en lot** (préfixe, suffixe, casse, aperçu live, application
-  atomique après validation). L'onglet **Détails** reste un placeholder
-  jusqu'au commit 5.
+  atomique après validation).
+- L'onglet **Détails** résume extension, taille source, statut, moteur,
+  indicateur **secours Pandoc**, type d'erreur et message le cas échéant.
 - ``set_record(record_or_none)`` met à jour les onglets pour le record
   sélectionné (ou ``None``).
 - ``set_file_model(model)`` relie le renommage en lot à la file (appelé depuis
@@ -34,6 +35,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QFont
 from PySide6.QtWidgets import (
     QComboBox,
+    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -47,7 +49,11 @@ from PySide6.QtWidgets import (
 )
 
 from converter import ConversionStatus, FileConversionRecord
-from ui_qt_file_model import ConversionFileTableModel
+from ui_qt_file_model import (
+    ConversionFileTableModel,
+    conversion_status_label_fr,
+    format_source_file_size,
+)
 from ui_qt_inspector_data import parse_front_matter
 from ui_qt_inspector_rename import (
     CASE_LOWER,
@@ -58,6 +64,7 @@ from ui_qt_inspector_rename import (
     execute_rename_plan,
     plan_bulk_rename,
 )
+from utils import normalize_extension
 
 # --- Couleurs et polices ----------------------------------------------------
 # Alignées sur ``design_handoff_ui_refonte/README.md``.
@@ -101,20 +108,6 @@ def _build_preview_yaml_html(front_matter: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
-def _placeholder_tab(message: str, object_name: str) -> QWidget:
-    """Onglet placeholder utilisé pour Sortie / Détails (commits 3-5)."""
-    widget = QFrame()
-    widget.setObjectName(object_name)
-    layout = QVBoxLayout(widget)
-    layout.setContentsMargins(16, 16, 16, 16)
-    label = QLabel(message, widget)
-    label.setWordWrap(True)
-    label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-    label.setObjectName(f"{object_name}_label")
-    layout.addWidget(label, stretch=1)
-    return widget
-
-
 class MarkdownInspectorPanel(QFrame):
     """Panneau droit avec onglets Aperçu / Sortie / Détails (PLO-38).
 
@@ -139,11 +132,7 @@ class MarkdownInspectorPanel(QFrame):
 
         self._preview_tab = self._build_preview_tab()
         self._output_tab = self._build_output_tab()
-        self._details_tab = _placeholder_tab(
-            "Onglet « Détails » — disponible dans un commit ultérieur (format, "
-            "taille, moteur, badge « secours », message d'erreur typé).",
-            "inspector_tab_details",
-        )
+        self._details_tab = self._build_details_tab()
 
         self._tabs.addTab(self._preview_tab, "Aperçu")
         self._tabs.addTab(self._output_tab, "Sortie")
@@ -155,6 +144,7 @@ class MarkdownInspectorPanel(QFrame):
         self._file_model: ConversionFileTableModel | None = None
         self._render_empty_state()
         self._refresh_output_tab(None)
+        self._refresh_details_tab(None)
 
     # --- Construction de l'onglet Aperçu ------------------------------------
 
@@ -305,6 +295,60 @@ class MarkdownInspectorPanel(QFrame):
 
         return widget
 
+    def _build_details_tab(self) -> QWidget:
+        """Onglet Détails : extension, taille, statut, moteur, secours Pandoc, erreur, message."""
+        widget = QFrame()
+        widget.setObjectName("inspector_tab_details")
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        self._details_hint = QLabel("", widget)
+        self._details_hint.setObjectName("inspector_details_hint")
+        self._details_hint.setWordWrap(True)
+        layout.addWidget(self._details_hint)
+
+        form_host = QWidget(widget)
+        form = QFormLayout(form_host)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(6)
+
+        def value_label(object_name: str) -> QLabel:
+            lbl = QLabel("—", form_host)
+            lbl.setObjectName(object_name)
+            lbl.setWordWrap(True)
+            lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            return lbl
+
+        self._detail_format = value_label("inspector_detail_format")
+        form.addRow("Extension source", self._detail_format)
+
+        self._detail_size = value_label("inspector_detail_size")
+        form.addRow("Taille source", self._detail_size)
+
+        self._detail_status = value_label("inspector_detail_status")
+        form.addRow("Statut", self._detail_status)
+
+        self._detail_engine = value_label("inspector_detail_engine")
+        form.addRow("Moteur", self._detail_engine)
+
+        self._detail_fallback = value_label("inspector_detail_fallback")
+        form.addRow("Secours Pandoc", self._detail_fallback)
+
+        self._detail_error_type = value_label("inspector_detail_error_type")
+        form.addRow("Type d'erreur", self._detail_error_type)
+
+        self._detail_message = QTextEdit(form_host)
+        self._detail_message.setObjectName("inspector_detail_message")
+        self._detail_message.setReadOnly(True)
+        self._detail_message.setMaximumHeight(120)
+        self._detail_message.setPlaceholderText("—")
+        form.addRow("Message", self._detail_message)
+
+        layout.addWidget(form_host, stretch=1)
+        return widget
+
     # --- API publique --------------------------------------------------------
 
     def set_record(self, record: FileConversionRecord | None) -> None:
@@ -317,6 +361,7 @@ class MarkdownInspectorPanel(QFrame):
         else:
             self._render_preview(record)
         self._refresh_output_tab(record)
+        self._refresh_details_tab(record)
 
     def current_record(self) -> FileConversionRecord | None:
         return self._current_record
@@ -413,6 +458,51 @@ class MarkdownInspectorPanel(QFrame):
         self._output_copy.setEnabled(True)
         self._output_open_folder.setEnabled(True)
         self._sync_bulk_rename_ui()
+
+    def _refresh_details_tab(self, record: FileConversionRecord | None) -> None:
+        """Met à jour l'onglet Détails (extension, taille, statut, moteur, diagnostic)."""
+        _fallback_yes_style = (
+            "QLabel { background-color: #e3f2fd; color: #0b66c2; "
+            "padding: 4px 8px; border-radius: 4px; }"
+        )
+        if record is None:
+            self._details_hint.setVisible(True)
+            self._details_hint.setText(
+                "Sélectionnez un fichier dans la file pour afficher format, taille, moteur et diagnostic."
+            )
+            self._detail_format.setText("—")
+            self._detail_size.setText("—")
+            self._detail_status.setText("—")
+            self._detail_engine.setText("—")
+            self._detail_fallback.setText("—")
+            self._detail_fallback.setStyleSheet("")
+            self._detail_fallback.setToolTip("")
+            self._detail_error_type.setText("—")
+            self._detail_message.clear()
+            return
+
+        self._details_hint.setVisible(False)
+        self._details_hint.clear()
+
+        ext = normalize_extension(record.source_path)
+        self._detail_format.setText(ext or "—")
+        self._detail_size.setText(format_source_file_size(record.source_path))
+        self._detail_status.setText(conversion_status_label_fr(record.status))
+        self._detail_engine.setText(record.engine_used or "—")
+
+        if record.used_pandoc_fallback:
+            self._detail_fallback.setText("Oui")
+            self._detail_fallback.setStyleSheet(_fallback_yes_style)
+            self._detail_fallback.setToolTip(
+                "Ce Markdown a été produit (en tout ou en partie) via le moteur de secours Pandoc."
+            )
+        else:
+            self._detail_fallback.setText("Non")
+            self._detail_fallback.setStyleSheet("")
+            self._detail_fallback.setToolTip("")
+
+        self._detail_error_type.setText(record.error_type or "—")
+        self._detail_message.setPlainText((record.message or "").strip())
 
     def _on_output_copy_path(self) -> None:
         if self._resolved_output_path is None:
@@ -523,6 +613,7 @@ class MarkdownInspectorPanel(QFrame):
             return
         model.refresh_all()
         self._refresh_output_tab(self._current_record)
+        self._refresh_details_tab(self._current_record)
         self._sync_bulk_rename_ui()
 
 

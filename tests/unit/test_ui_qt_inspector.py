@@ -300,6 +300,81 @@ def test_output_tab_bulk_rename_apply_updates_model_and_disk(
     assert not a.exists()
 
 
+def test_details_tab_shows_hint_without_selection(qt_app: object) -> None:
+    from PySide6.QtWidgets import QLabel
+
+    from ui_qt_inspector import MarkdownInspectorPanel
+
+    panel = MarkdownInspectorPanel()
+    panel.set_record(None)
+    hint = panel.findChild(QLabel, "inspector_details_hint")
+    assert hint is not None
+    assert hint.isHidden() is False
+    assert "Sélectionnez" in hint.text()
+
+
+def test_details_tab_populated_for_record(qt_app: object, tmp_path: Path) -> None:
+    from PySide6.QtWidgets import QLabel
+
+    from converter import ConversionStatus, FileConversionRecord
+    from ui_qt_inspector import MarkdownInspectorPanel
+
+    src = tmp_path / "doc.pdf"
+    src.write_bytes(b"x" * 800)
+    out = tmp_path / "out.md"
+    out.write_text("# Titre\n", encoding="utf-8")
+    rec = FileConversionRecord(
+        source_path=src,
+        status=ConversionStatus.SUCCESS_FALLBACK,
+        output_path=out,
+        engine_used="Pandoc",
+        used_pandoc_fallback=True,
+        error_type=None,
+        message="",
+    )
+    panel = MarkdownInspectorPanel()
+    panel.set_record(rec)
+
+    hint = panel.findChild(QLabel, "inspector_details_hint")
+    assert hint is not None and hint.isHidden() is True
+
+    ext_lbl = panel.findChild(QLabel, "inspector_detail_format")
+    assert ext_lbl is not None and ext_lbl.text() == ".pdf"
+
+    eng = panel.findChild(QLabel, "inspector_detail_engine")
+    assert eng is not None and eng.text() == "Pandoc"
+
+    fb = panel.findChild(QLabel, "inspector_detail_fallback")
+    assert fb is not None and fb.text() == "Oui"
+
+    err_t = panel.findChild(QLabel, "inspector_detail_error_type")
+    assert err_t is not None and err_t.text() == "—"
+
+
+def test_details_tab_error_fields(qt_app: object, tmp_path: Path) -> None:
+    from PySide6.QtWidgets import QLabel, QTextEdit
+
+    from converter import ConversionStatus, FileConversionRecord
+    from ui_qt_inspector import MarkdownInspectorPanel
+
+    src = tmp_path / "x.docx"
+    src.write_bytes(b"1")
+    rec = FileConversionRecord(
+        source_path=src,
+        status=ConversionStatus.ERROR,
+        message="Fichier illisible.",
+        error_type="EngineFailureError",
+    )
+    panel = MarkdownInspectorPanel()
+    panel.set_record(rec)
+
+    err_t = panel.findChild(QLabel, "inspector_detail_error_type")
+    assert err_t is not None and err_t.text() == "EngineFailureError"
+
+    msg = panel.findChild(QTextEdit, "inspector_detail_message")
+    assert msg is not None and "illisible" in msg.toPlainText()
+
+
 def test_inspector_wired_to_file_selection(qt_app: object, tmp_path: Path) -> None:
     from PySide6.QtCore import QItemSelectionModel
 

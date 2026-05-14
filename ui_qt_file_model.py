@@ -96,6 +96,16 @@ def _status_label_fr(status: ConversionStatus) -> str:
     return mapping.get(status, status.value)
 
 
+def conversion_status_label_fr(status: ConversionStatus) -> str:
+    """Libellé court du statut en français (table, inspecteur)."""
+    return _status_label_fr(status)
+
+
+def format_source_file_size(path: Path) -> str:
+    """Taille du fichier source pour affichage dans l'UI (o, Ko, …)."""
+    return _format_file_size(_file_size_bytes(path))
+
+
 def _progress_display(progress_percent: float) -> str:
     pct = max(0.0, min(1.0, progress_percent))
     return f"{round(pct * 100)} %"
@@ -180,7 +190,7 @@ class ConversionFileTableModel(QAbstractTableModel):
             if col == _COL_SIZE:
                 return _format_file_size(_file_size_bytes(rec.source_path))
             if col == _COL_STATUS:
-                return _status_label_fr(rec.status)
+                return conversion_status_label_fr(rec.status)
             if col == _COL_PROGRESS:
                 return _progress_display(rec.progress_percent)
             return None

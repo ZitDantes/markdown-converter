@@ -95,3 +95,19 @@ def test_set_records_reset(qt_app: object, tmp_path: Path) -> None:
     assert m.rowCount(QModelIndex()) == 1
     m.set_records([])
     assert m.rowCount(QModelIndex()) == 0
+
+
+def test_conversion_status_label_fr_coherent_avec_colonne_statut() -> None:
+    from ui_qt_file_model import conversion_status_label_fr
+
+    assert conversion_status_label_fr(ConversionStatus.QUEUED) == "En attente"
+    assert conversion_status_label_fr(ConversionStatus.SUCCESS_FALLBACK) == "OK · secours"
+
+
+def test_format_source_file_size(qt_app: object, tmp_path: Path) -> None:
+    from ui_qt_file_model import format_source_file_size
+
+    p = tmp_path / "b.bin"
+    p.write_bytes(b"x" * 2048)
+    txt = format_source_file_size(p)
+    assert "Ko" in txt or "o" in txt
