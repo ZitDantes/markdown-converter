@@ -250,3 +250,121 @@ def test_success_fallback_when_primary_fails_and_pandoc_recovers(
     assert record.used_pandoc_fallback is True
     assert record.engine_used == "FakePandoc"
     assert record.output_path is not None and record.output_path.exists()
+
+
+def test_strict_skips_fallback_after_primary_engine_error(
+    tmp_path: Path,
+    fixtures_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``use_conversion_fallback=False`` : pas de secours après échec du primaire."""
+    import converter
+    from engines import EngineConversionError
+
+    class _BrokenPrimary:
+        name = "FakeMarkItDown"
+
+        @classmethod
+        def is_available(cls) -> bool:
+            return True
+
+        def supports(self, path: Path) -> bool:
+            return True
+
+        def convert(self, src: Path) -> str:
+            raise EngineConversionError("simulated primary failure")
+
+    class _GoodFallback:
+        name = "FakePandoc"
+
+        @classmethod
+        def is_available(cls) -> bool:
+            return True
+
+        @classmethod
+        def executable_path(cls) -> str:
+            return "/fake/pandoc"
+
+        def supports(self, path: Path) -> bool:
+            return True
+
+        def convert(self, src: Path) -> str:
+            return "# Contenu récupéré\n\nLe secours a fonctionné."
+
+    monkeypatch.setattr(converter, "MarkItDownEngine", _BrokenPrimary)
+    monkeypatch.setattr(converter, "PandocEngine", _GoodFallback)
+
+    src = tmp_path / "simple.txt"
+    shutil.copy(fixtures_dir / "simple.txt", src)
+    output_dir = tmp_path / "out"
+
+    summary = convert_files(
+        explicit_files=[src],
+        directory_roots=[],
+        output_dir=output_dir,
+        use_conversion_fallback=False,
+    )
+
+    assert len(summary.records) == 1
+    record = summary.records[0]
+    assert record.status is ConversionStatus.ERROR
+    assert record.output_path is None
+    assert list(output_dir.glob("*.md")) == []
+
+
+def test_strict_empty_primary_yields_empty_without_fallback(
+    tmp_path: Path,
+    fixtures_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mode strict : résultat vide du primaire, sans tentative de secours."""
+    import converter
+
+    class _EmptyPrimary:
+        name = "FakeMarkItDown"
+
+        @classmethod
+        def is_available(cls) -> bool:
+            return True
+
+        def supports(self, path: Path) -> bool:
+            return True
+
+        def convert(self, src: Path) -> str:
+            return ""
+
+    class _GoodFallback:
+        name = "FakePandoc"
+
+        @classmethod
+        def is_available(cls) -> bool:
+            return True
+
+        @classmethod
+        def executable_path(cls) -> str:
+            return "/fake/pandoc"
+
+        def supports(self, path: Path) -> bool:
+            return True
+
+        def convert(self, src: Path) -> str:
+            return "# Secours\n\nContenu."
+
+    monkeypatch.setattr(converter, "MarkItDownEngine", _EmptyPrimary)
+    monkeypatch.setattr(converter, "PandocEngine", _GoodFallback)
+
+    src = tmp_path / "simple.txt"
+    shutil.copy(fixtures_dir / "simple.txt", src)
+    output_dir = tmp_path / "out"
+
+    summary = convert_files(
+        explicit_files=[src],
+        directory_roots=[],
+        output_dir=output_dir,
+        use_conversion_fallback=False,
+    )
+
+    assert len(summary.records) == 1
+    record = summary.records[0]
+    assert record.status is ConversionStatus.EMPTY
+    assert list(output_dir.glob("*.md")) == []
