@@ -4,9 +4,27 @@ Le format est inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-15
+
+Version orientée **interface graphique PySide6** (UI Qt complète) et **documentation utilisateur** dans le dépôt (`docs/`).
+
 ### Ajouté
 
+- **Interface PySide6** (opt-in via `MARKDOWN_CONVERTER_UI=qt`) : file de conversion avec statuts et progression par fichier, inspecteur (aperçu / sortie / détails), journal repliable avec filtres, thème clair/sombre persistant, glisser-déposer, modes **Standard** / **Strict**, persistance de la file et du dossier de sortie (`settings.json`).
+- **Documentation utilisateur** : guide dans [`docs/`](docs/README.md) (installation, premiers pas, interface, dépannage, confidentialité).
 - Fichier [`LICENSE`](LICENSE) à la racine : **licence MIT** (copyright 2026 ZitDantes) ; README et CONTRIBUTING alignés.
+- Tests d’intégration UI Qt (`QT_QPA_PLATFORM=offscreen`) en CI (Python 3.12).
+
+### Modifié
+
+- Statuts de conversion enrichis (`SUCCESS_REVIEW`, `SUCCESS_FALLBACK`, `QUEUED`, progression par fichier, aperçu Markdown en mémoire optionnel).
+- README : section prototype Qt mise à jour ; lien vers la documentation `docs/`.
+
+### À retenir pour les utilisateurs
+
+- L’UI **recommandée** en v0.2 est **Qt** (`MARKDOWN_CONVERTER_UI=qt` depuis les sources ; voir [docs/utilisateur/02-installation.md](docs/utilisateur/02-installation.md)).
+- L’interface **Tkinter** reste disponible par défaut si la variable d’environnement n’est pas définie.
+- Distribution macOS : archive `MarkdownConverter-mac-v0.2.0.zip` sur GitHub Releases (voir notes de release).
 
 ## [0.1.0] — 2026-05-13
 
