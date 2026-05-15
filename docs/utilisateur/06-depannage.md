@@ -41,6 +41,10 @@ Avec Python Homebrew, installez `python-tk@3.12` (même version que Python), pui
 
 Souvent un PDF image sans texte. Essayez un export « texte » ou un autre format source.
 
+### `MagikaError: model dir not found` (application packagée `.app`)
+
+Version corrigée à partir de **v0.2.0** (rebuild PyInstaller avec les modèles `magika` inclus). Si vous voyez encore ce message, retéléchargez la dernière archive **GitHub Release** ou reconstruisez avec `./scripts/build_mac_app.sh`.
+
 ### Secours non disponible
 
 En mode **Standard**, si la conversion principale échoue et qu’aucun secours n’est installé, le fichier reste en erreur. Installez [Pandoc](https://pandoc.org/) (`brew install pandoc`) ou passez en revue le format source.

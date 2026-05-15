@@ -16,6 +16,13 @@ datas += md_datas
 binaries += md_binaries
 hiddenimports += md_hidden
 
+# MarkItDown s'appuie sur magika (détection de type) ; les fichiers model.onnx ne
+# sont pas tirés par collect_all("markitdown") — requis pour PDF et autres formats.
+magika_datas, magika_binaries, magika_hidden = collect_all("magika")
+datas += magika_datas
+binaries += magika_binaries
+hiddenimports += magika_hidden
+
 # PLO-58 / v0.2 : modules UI Qt (pas collect_all PySide6 — évite WebEngine/QML ~1 Go).
 hiddenimports += [
     "ui_qt",
