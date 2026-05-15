@@ -18,7 +18,7 @@ fi
 # shellcheck source=/dev/null
 source .venv/bin/activate
 
-python3 -m pip install -q pyinstaller
+python3 -m pip install -q -r requirements.txt -r requirements-qt.txt pyinstaller
 rm -rf build dist
 python3 -m PyInstaller --noconfirm MarkdownConverter.spec
 

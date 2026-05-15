@@ -24,7 +24,7 @@ Version orientée **interface graphique PySide6** (UI Qt complète) et **documen
 
 - L’UI **recommandée** en v0.2 est **Qt** (`MARKDOWN_CONVERTER_UI=qt` depuis les sources ; voir [docs/utilisateur/02-installation.md](docs/utilisateur/02-installation.md)).
 - L’interface **Tkinter** reste disponible par défaut si la variable d’environnement n’est pas définie.
-- Distribution macOS : archive `MarkdownConverter-mac-v0.2.0.zip` sur GitHub Releases (voir notes de release).
+- Distribution macOS : archive `MarkdownConverter-mac-v0.2.0.zip` sur GitHub Releases (~310 Mo : MarkItDown + PySide6 ; interface **Qt** par défaut dans le `.app` via `LSEnvironment`).
 
 ## [0.1.0] — 2026-05-13
 
