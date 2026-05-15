@@ -1,17 +1,25 @@
 Markdown Converter — installation rapide (macOS)
 ==================================================
 
+Version 0.2 — interface graphique Qt (recommandée dans ce bundle).
+
 Contenu du ZIP :
 
 - « Markdown Converter.app » : l’application (double-clic pour lancer).
-- LISEZMOI.txt : ce fichier (copie de la documentation courte).
+- LISEZMOI.txt : ce fichier.
 
 Installation recommandée :
 
 1. Décompressez le ZIP.
-2. Glissez « Markdown Converter.app » dans le dossier « Applications » de votre Mac (recommandé).
+2. Glissez « Markdown Converter.app » dans le dossier « Applications » de votre Mac.
 3. Au premier lancement, si macOS affiche un avertissement (développeur non identifié), faites un clic droit sur l’icône puis « Ouvrir », ou autorisez dans Réglages système → Confidentialité et sécurité.
 
-Pandoc n’est pas inclus dans l’application : le secours Pandoc ne fonctionne que si Pandoc est installé séparément sur votre Mac. L’application fonctionne sans.
+Documentation utilisateur complète (guides pas à pas) :
 
-Pour toute question technique, consultez le dépôt GitHub du projet (README et issues).
+  https://github.com/ZitDantes/markdown-converter/tree/main/docs
+
+Pandoc n’est pas inclus dans l’application : le secours ne fonctionne que si Pandoc est installé séparément (brew install pandoc). L’application fonctionne sans.
+
+Traitement 100 % local : aucune donnée n’est envoyée vers un service cloud.
+
+Pour toute question : dépôt GitHub (README, issues).

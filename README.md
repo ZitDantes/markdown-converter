@@ -7,8 +7,11 @@ Le code source est distribué sous **licence MIT** (voir le fichier [`LICENSE`](
 
 Application **macOS** (Python 3) pour convertir en lot des documents bureautiques en fichiers **Markdown** (UTF-8), en vue d’alimenter une base de connaissances ou un système RAG. **Tout est local** : aucune donnée n’est envoyée vers un service cloud.
 
+**Guide pas à pas (installation, interface Qt, dépannage)** : [`docs/README.md`](docs/README.md).
+
 ## Table des matières
 
+- [Documentation utilisateur (`docs/`)](docs/README.md)
 - [Pour les utilisateurs](#pour-les-utilisateurs)
   - [Télécharger la dernière version](#telecharger-la-derniere-version)
 - [Logs et diagnostic](#logs-et-diagnostic)
@@ -224,6 +227,7 @@ Pour **contribuer au code** (correctifs, évolutions, documentation technique), 
 | `utils.py` | Extensions, chemins, nettoyage Markdown, avertissements par format. |
 | `MarkdownConverter.spec` | Définition PyInstaller (build `.app` reproductible). |
 | `scripts/build_mac_app.sh` | Script : PyInstaller + ZIP daté + LISEZMOI pour collègues. |
+| `docs/README.md` | Index de la **documentation utilisateur** (guides en `docs/utilisateur/`). |
 | `docs/LISEZMOI_COLLEGUES.txt` | Texte d’accompagnement pour l’archive distribuée. |
 | `samples/` | Dossier local pour les documents de test (ignoré par git, voir [`samples/README.md`](samples/README.md)). |
 | `tests/` | Suite pytest (`unit/`, `integration/`, `fixtures/`, `conftest.py`). |
