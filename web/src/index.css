@@ -179,6 +179,139 @@ button {
   opacity: 0.7;
 }
 
+/* ── Toolbar PLO-50 ──────────────────────────────────── */
+
+.conversion-toolbar {
+  flex-shrink: 0;
+}
+
+.toolbar--actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toolbar-search {
+  width: min(100%, 280px);
+  min-width: 180px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--mc-radius-button);
+  border: 0.5px solid var(--mc-border-subtle);
+  background: var(--mc-bg-input);
+  color: var(--mc-text-primary);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.toolbar-search::placeholder {
+  color: var(--mc-text-secondary);
+}
+
+.toolbar-search:disabled {
+  opacity: 0.5;
+}
+
+.toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px 8px;
+}
+
+.toolbar-filters__label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--mc-text-secondary);
+  margin-right: 4px;
+}
+
+.toolbar-filters__clear {
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--mc-text-secondary);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.toolbar-filters__clear:hover {
+  background: var(--mc-bg-row-hover);
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--mc-bg-progress-track);
+  border: 0.5px solid var(--mc-border-subtle);
+}
+
+.segmented__btn {
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mc-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segmented__btn--active {
+  background: var(--mc-bg-button);
+  color: var(--mc-text-primary);
+  font-weight: 600;
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06);
+}
+
+.segmented__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.format-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px 0 7px;
+  border-radius: 12px;
+  border: 0.5px solid var(--mc-border-subtle);
+  background: var(--mc-bg-progress-track);
+  color: var(--mc-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.format-chip--active {
+  font-weight: 600;
+}
+
+.format-chip__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.format-chip__count {
+  opacity: 0.75;
+  font-weight: 500;
+}
+
 .output-bar {
   display: flex;
   align-items: center;

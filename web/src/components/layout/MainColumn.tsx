@@ -1,9 +1,22 @@
 import type { ReactNode } from "react";
-import type { QueueState } from "@shared/bridge-contract";
+import type { FileQueueItem, QueueState } from "@shared/bridge-contract";
+import {
+  ConversionToolbar,
+  type ConversionMode,
+} from "../toolbar/ConversionToolbar";
 
 type MainColumnProps = {
   queue: QueueState | null;
+  items: FileQueueItem[];
+  isDark: boolean;
   bridgeReady: boolean;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+  activeExtensions: ReadonlySet<string>;
+  onToggleExtension: (ext: string) => void;
+  onClearFilters: () => void;
+  conversionMode: ConversionMode;
+  onConversionModeChange: (mode: ConversionMode) => void;
   onPickFiles: () => void;
   onPickFolder: () => void;
   onClear: () => void;
@@ -13,7 +26,16 @@ type MainColumnProps = {
 
 export function MainColumn({
   queue,
+  items,
+  isDark,
   bridgeReady,
+  searchQuery,
+  onSearchChange,
+  activeExtensions,
+  onToggleExtension,
+  onClearFilters,
+  conversionMode,
+  onConversionModeChange,
   onPickFiles,
   onPickFolder,
   onClear,
@@ -22,25 +44,21 @@ export function MainColumn({
 }: MainColumnProps) {
   return (
     <div className="main-column">
-      <div className="toolbar" role="toolbar" aria-label="Actions principales">
-        <button type="button" className="btn" disabled={!bridgeReady} onClick={onPickFiles}>
-          Fichiers
-        </button>
-        <button type="button" className="btn" disabled={!bridgeReady} onClick={onPickFolder}>
-          Dossier
-        </button>
-        <button type="button" className="btn btn--ghost" disabled={!bridgeReady} onClick={onClear}>
-          Vider
-        </button>
-        <span className="toolbar__sep" aria-hidden />
-        <span className="toolbar__stub" title="Parité toolbar — PLO-50">
-          Modes Standard / Strict (à venir)
-        </span>
-        <span className="toolbar__flex" />
-        <span className="toolbar__stub toolbar__stub--search" title="Recherche — PLO-50">
-          Rechercher…
-        </span>
-      </div>
+      <ConversionToolbar
+        items={items}
+        isDark={isDark}
+        bridgeReady={bridgeReady}
+        searchQuery={searchQuery}
+        onSearchChange={onSearchChange}
+        activeExtensions={activeExtensions}
+        onToggleExtension={onToggleExtension}
+        onClearFilters={onClearFilters}
+        conversionMode={conversionMode}
+        onConversionModeChange={onConversionModeChange}
+        onPickFiles={onPickFiles}
+        onPickFolder={onPickFolder}
+        onClear={onClear}
+      />
 
       <div className="output-bar">
         <span className="output-bar__icon" aria-hidden>
@@ -61,3 +79,4 @@ export function MainColumn({
     </div>
   );
 }
+
