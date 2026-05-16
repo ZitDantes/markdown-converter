@@ -5,6 +5,8 @@ import { InspectorPanel } from "./components/layout/InspectorPanel";
 import { LogDrawer } from "./components/layout/LogDrawer";
 import { MainColumn } from "./components/layout/MainColumn";
 import { ConversionQueue } from "./components/queue/ConversionQueue";
+import type { ConversionMode } from "./components/toolbar/ConversionToolbar";
+import { filterQueueItems } from "./lib/queueFilters";
 import { useTheme } from "./theme/useTheme";
 import {
   connectBackend,
@@ -33,7 +35,9 @@ export function App() {
   const [queue, setQueue] = useState<QueueState | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [batchPercent, setBatchPercent] = useState(0);
-  const strictMode = false; /* modes Standard/Strict — PLO-50 */
+  const [conversionMode, setConversionMode] = useState<ConversionMode>("standard");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeExtensions, setActiveExtensions] = useState<Set<string>>(() => new Set());
   const [logOpen, setLogOpen] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("preview");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -107,9 +111,28 @@ export function App() {
 
   const bridgeReady = status === "ready" && backend !== null;
   const items = queue?.items ?? [];
+  const visibleItems = useMemo(
+    () => filterQueueItems(items, activeExtensions, searchQuery),
+    [items, activeExtensions, searchQuery],
+  );
   const doneCount = useMemo(() => countDone(items), [items]);
   const isConverting = items.some((i) => i.status === "processing");
   const queueActionsDisabled = !bridgeReady || isConverting;
+  const strictMode = conversionMode === "strict";
+
+  const toggleExtension = useCallback((ext: string) => {
+    setActiveExtensions((prev) => {
+      const next = new Set(prev);
+      if (next.has(ext)) next.delete(ext);
+      else next.add(ext);
+      return next;
+    });
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setActiveExtensions(new Set());
+    setSearchQuery("");
+  }, []);
 
   const onPickFiles = async () => {
     if (!backend) return;
@@ -140,13 +163,15 @@ export function App() {
       useConversionFallback: !strictMode,
     });
     await qtInvoke(() => backend.startConversion(cmd));
-    pushLog("[INFO] conversion démarrée");
+    const modeLabel = strictMode ? "Strict" : "Standard";
+    pushLog(`[INFO] conversion démarrée (mode ${modeLabel})`);
   };
 
   const onClear = async () => {
     if (!backend) return;
     await qtInvoke(() => backend.clearQueue());
     setSelectedPath(null);
+    clearFilters();
     await refreshQueue(backend);
     pushLog("[INFO] file vidée");
   };
@@ -172,14 +197,24 @@ export function App() {
       main={
         <MainColumn
           queue={queue}
+          items={items}
+          isDark={isDark}
           bridgeReady={bridgeReady}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          activeExtensions={activeExtensions}
+          onToggleExtension={toggleExtension}
+          onClearFilters={clearFilters}
+          conversionMode={conversionMode}
+          onConversionModeChange={setConversionMode}
           onPickFiles={() => void onPickFiles()}
           onPickFolder={() => void onPickFolder()}
           onClear={() => void onClear()}
           onPickOutput={() => void onPickOutput()}
           queueList={
             <ConversionQueue
-              items={items}
+              visibleItems={visibleItems}
+              totalCount={items.length}
               queue={queue}
               selectedPath={selectedPath}
               isDark={isDark}
