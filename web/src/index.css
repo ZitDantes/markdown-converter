@@ -896,20 +896,35 @@ button {
   border-radius: 3px;
 }
 
-/* ── Log drawer ──────────────────────────────────────── */
+/* ── Log drawer (PLO-52) ─────────────────────────────── */
 
 .log-drawer {
   flex-shrink: 0;
   border-top: 0.5px solid var(--mc-border-split);
   background: var(--mc-bg-footer);
+  max-height: 38px;
+  overflow: hidden;
+  transition: max-height 220ms cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+.log-drawer--open {
+  max-height: min(360px, 42vh);
+}
+
+.log-drawer__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  min-height: 38px;
 }
 
 .log-drawer__toggle {
-  width: 100%;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 8px 0;
   border: none;
   background: transparent;
   color: var(--mc-text-primary);
@@ -917,6 +932,54 @@ button {
   font-weight: 600;
   cursor: pointer;
   text-align: left;
+}
+
+.log-drawer__count {
+  font-weight: 500;
+  color: var(--mc-text-secondary);
+  font-size: 11px;
+}
+
+.log-drawer__header-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.log-drawer__open-file {
+  border: none;
+  background: transparent;
+  color: var(--mc-accent);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.log-drawer__path {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  color: var(--mc-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-drawer__empty {
+  color: var(--mc-text-secondary);
+  font-style: italic;
+}
+
+.log-line__prefix {
+  opacity: 0.85;
+}
+
+.footer-bar__journal--active {
+  background: color-mix(in srgb, var(--mc-accent) 14%, transparent);
+  color: var(--mc-accent);
 }
 
 .log-drawer__chevron {
@@ -953,7 +1016,7 @@ button {
 
 .log-drawer__log {
   margin: 0;
-  max-height: 140px;
+  max-height: min(220px, 28vh);
   overflow: auto;
   font-family: var(--mc-font-mono);
   font-size: 11px;

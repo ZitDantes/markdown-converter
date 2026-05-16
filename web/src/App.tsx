@@ -7,6 +7,15 @@ import { MainColumn } from "./components/layout/MainColumn";
 import { ConversionQueue } from "./components/queue/ConversionQueue";
 import type { ConversionMode } from "./components/toolbar/ConversionToolbar";
 import { filterQueueItems } from "./lib/queueFilters";
+import {
+  computeBatchPercent,
+  countConversionResults,
+  mergeSummaryIntoQueue,
+  parseConversionFinishedPayload,
+  parseJsonValue,
+  pollQueueUntilIdle,
+} from "./lib/queueSync";
+import { normalizeLogLevel, parseLogLine, type LogEntry } from "./lib/logJournal";
 import { useTheme } from "./theme/useTheme";
 import {
   connectBackend,
@@ -16,7 +25,7 @@ import {
   type QueueState,
   type WebBackendBridge,
 } from "./bridge";
-import { parseJson, qtInvoke, type AckResult } from "@shared/bridge-contract";
+import { parseJson, qtInvoke, type AckResult, type SetOutputDirResult } from "@shared/bridge-contract";
 
 type BridgeStatus = "loading" | "ready" | "error";
 function countDone(items: QueueState["items"]): number {
@@ -31,7 +40,8 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [backend, setBackend] = useState<WebBackendBridge | null>(null);
   const [queue, setQueue] = useState<QueueState | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
+  const [logFilePath, setLogFilePath] = useState<string | null>(null);
   const [batchPercent, setBatchPercent] = useState(0);
   const [conversionMode, setConversionMode] = useState<ConversionMode>("standard");
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,13 +50,24 @@ export function App() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("preview");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
 
-  const pushLog = useCallback((line: string) => {
-    setLogs((prev) => [...prev.slice(-200), line]);
+  const appendLog = useCallback((level: string, message: string) => {
+    setLogEntries((prev) => [
+      ...prev.slice(-500),
+      { level: normalizeLogLevel(level), message },
+    ]);
   }, []);
 
-  const refreshQueue = useCallback(async (b: WebBackendBridge) => {
-    const state = await fetchQueueState(b);
+  const pushLog = useCallback(
+    (line: string) => {
+      const parsed = parseLogLine(line);
+      appendLog(parsed.level, parsed.message);
+    },
+    [appendLog],
+  );
+
+  const applyQueueSnapshot = useCallback((state: QueueState) => {
     setQueue(state);
+    setBatchPercent(computeBatchPercent(state));
     setSelectedPath((prev) => {
       if (state.items.length === 0) return null;
       if (prev && state.items.some((i) => i.sourcePath === prev)) return prev;
@@ -54,47 +75,73 @@ export function App() {
     });
   }, []);
 
+  const refreshQueue = useCallback(
+    async (b: WebBackendBridge) => {
+      const state = await fetchQueueState(b);
+      applyQueueSnapshot(state);
+    },
+    [applyQueueSnapshot],
+  );
+
   useEffect(() => {
     let cancelled = false;
+    let progressRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleQueueRefresh = (b: WebBackendBridge) => {
+      if (progressRefreshTimer !== null) {
+        clearTimeout(progressRefreshTimer);
+      }
+      progressRefreshTimer = setTimeout(() => {
+        progressRefreshTimer = null;
+        if (!cancelled) {
+          void refreshQueue(b);
+        }
+      }, 80);
+    };
 
     (async () => {
       try {
         const b = await connectBackend();
         if (cancelled) return;
-        const pong = await pingBackend(b, "démarrage");
-        pushLog(`[INFO] ping : ${pong}`);
+        await pingBackend(b, "démarrage");
+        appendLog("INFO", "Application prête.");
 
         b.logEmitted?.connect((level, message) => {
-          pushLog(`[${level.toUpperCase()}] ${message}`);
+          appendLog(level, message);
         });
         b.progressUpdated?.connect((progressJson) => {
-          const ev = parseJson<ProgressEvent>(progressJson);
+          const ev = parseJsonValue<ProgressEvent>(progressJson);
           setBatchPercent(ev.batchPercent);
+          scheduleQueueRefresh(b);
         });
         b.queueUpdated?.connect((queueJson) => {
-          const state = parseJson<QueueState>(queueJson);
-          setQueue(state);
-          setSelectedPath((prev) => {
-            if (state.items.length === 0) return null;
-            if (prev && state.items.some((i) => i.sourcePath === prev)) return prev;
-            return state.items[0]?.sourcePath ?? null;
-          });
+          applyQueueSnapshot(parseJsonValue<QueueState>(queueJson));
         });
         b.conversionFinished?.connect((summaryJson) => {
-          const ev = parseJson<{ summary: { records: { statusLabel: string }[] } }>(summaryJson);
-          const n = ev.summary.records.length;
-          const ok = ev.summary.records.filter((r) => r.statusLabel.startsWith("OK")).length;
-          pushLog(`[INFO] conversion terminée : ${ok}/${n} fichier(s)`);
           setBatchPercent(1);
+          try {
+            const ev = parseConversionFinishedPayload(summaryJson);
+            setQueue((prev) =>
+              prev ? mergeSummaryIntoQueue(prev, ev.summary) : prev,
+            );
+          } catch {
+            /* repli : snapshot complet via le pont */
+          }
           void refreshQueue(b);
         });
-        b.conversionFailed?.connect((message) => {
-          pushLog(`[ERROR] ${message}`);
+        b.conversionFailed?.connect(() => {
           void refreshQueue(b);
         });
 
         setBackend(b);
         await refreshQueue(b);
+        try {
+          const rawPath = await qtInvoke(() => b.getLogFilePath());
+          const pathDto = parseJson<{ path: string }>(rawPath);
+          setLogFilePath(pathDto.path);
+        } catch {
+          setLogFilePath(null);
+        }
         setStatus("ready");
       } catch (e) {
         if (!cancelled) {
@@ -106,8 +153,11 @@ export function App() {
 
     return () => {
       cancelled = true;
+      if (progressRefreshTimer !== null) {
+        clearTimeout(progressRefreshTimer);
+      }
     };
-  }, [pushLog, refreshQueue]);
+  }, [appendLog, applyQueueSnapshot, pushLog, refreshQueue]);
 
   const bridgeReady = status === "ready" && backend !== null;
   const items = queue?.items ?? [];
@@ -155,7 +205,12 @@ export function App() {
   const onPickOutput = async () => {
     if (!backend) return;
     const raw = await qtInvoke(() => backend.pickOutputDir());
-    pushLog(`[INFO] sortie : ${raw}`);
+    const result = parseJson<SetOutputDirResult>(raw);
+    if (result.ok && result.outputDir) {
+      appendLog("INFO", `Dossier de sortie : ${result.outputDir}`);
+    } else if (result.errorMessage && result.errorMessage !== "Annulé") {
+      appendLog("WARNING", result.errorMessage);
+    }
     await refreshQueue(backend);
   };
 
@@ -166,9 +221,19 @@ export function App() {
       schemaVersion: "0",
       useConversionFallback: !strictMode,
     });
-    await qtInvoke(() => backend.startConversion(cmd));
+    const rawAck = await qtInvoke(() => backend.startConversion(cmd));
+    const ack = parseJsonValue<AckResult>(rawAck);
+    if (!ack.ok) {
+      appendLog("WARNING", ack.message ?? "Impossible de démarrer la conversion.");
+      return;
+    }
     const modeLabel = strictMode ? "Strict" : "Standard";
-    pushLog(`[INFO] conversion démarrée (mode ${modeLabel})`);
+    const fileCount = items.length;
+    appendLog("INFO", `Conversion démarrée (${fileCount} fichier(s), mode ${modeLabel})…`);
+    const finalState = await pollQueueUntilIdle(backend, applyQueueSnapshot);
+    const { ok, err } = countConversionResults(finalState.items);
+    appendLog("INFO", `Conversion terminée : ${ok} réussi(s), ${err} erreur(s).`);
+    setBatchPercent(1);
   };
 
   const onClear = async () => {
@@ -253,11 +318,25 @@ export function App() {
           doneCount={doneCount}
           canConvert={queue?.canStartConversion ?? false}
           bridgeReady={bridgeReady}
+          journalOpen={logOpen}
+          onToggleJournal={() => setLogOpen((o) => !o)}
           onConvert={() => void onConvert()}
         />
       }
       logDrawer={
-        <LogDrawer lines={logs} open={logOpen} onToggle={() => setLogOpen((o) => !o)} />
+        <LogDrawer
+          entries={logEntries}
+          open={logOpen}
+          logFilePath={logFilePath}
+          onToggle={() => setLogOpen((o) => !o)}
+          onOpenLogFile={
+            backend
+              ? () => {
+                  void qtInvoke(() => backend.openLogFile());
+                }
+              : undefined
+          }
+        />
       }
     />
   );

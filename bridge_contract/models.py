@@ -157,6 +157,14 @@ class BulkRenameApplyCommand:
 
 
 @dataclass
+class LogFilePathResult:
+    path: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"schemaVersion": SCHEMA_VERSION, "path": self.path}
+
+
+@dataclass
 class InspectorOutputPathResult:
     ok: bool
     outputPath: str | None = None

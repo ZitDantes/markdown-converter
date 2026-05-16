@@ -39,6 +39,11 @@ export interface FileQueueItem {
   errorType?: string | null;
 }
 
+export interface LogFilePathResult {
+  schemaVersion: SchemaVersion;
+  path: string;
+}
+
 export interface InspectorOutputPathResult {
   schemaVersion: SchemaVersion;
   ok: boolean;
@@ -172,8 +177,12 @@ export function qtInvoke<T>(callable: () => QtInvokeResult<T>): Promise<T> {
   return Promise.resolve(value);
 }
 
-export function parseJson<T>(raw: string): T {
-  return JSON.parse(raw) as T;
+/** Parse une réponse pont (chaîne JSON ou objet déjà désérialisé par QWebChannel). */
+export function parseJson<T>(raw: string | T): T {
+  if (typeof raw === "string") {
+    return JSON.parse(raw) as T;
+  }
+  return raw;
 }
 
 /** Objet exposé par QWebChannel (méthodes = commandes, propriétés = signaux) */
@@ -189,6 +198,8 @@ export interface WebBackendBridge {
   removeQueueItem(sourcePath: string): QtInvokeResult<string>;
   startConversion(commandJson: string): QtInvokeResult<string>;
   cancelConversion(): QtInvokeResult<string>;
+  getLogFilePath(): QtInvokeResult<string>;
+  openLogFile(): QtInvokeResult<string>;
   getInspectorPreview(sourcePath: string): QtInvokeResult<string>;
   getInspectorOutputPath(sourcePath: string): QtInvokeResult<string>;
   copyText(text: string): QtInvokeResult<string>;

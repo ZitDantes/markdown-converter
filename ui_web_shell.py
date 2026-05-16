@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
@@ -204,10 +205,14 @@ class WebBackend(QObject):
             )
 
         cmd = StartConversionCommand.from_json(command_json)
+        mode_label = "Standard" if cmd.useConversionFallback else "Strict"
         self._start_worker(
             paths, self._output_dir, use_conversion_fallback=cmd.useConversionFallback
         )
-        self.logEmitted.emit("INFO", f"Conversion démarrée ({len(paths)} fichier(s))…")
+        self.logEmitted.emit(
+            "INFO",
+            f"Conversion démarrée ({len(paths)} fichier(s), mode {mode_label})…",
+        )
         self._emit_queue_updated()
         return json.dumps(AckResult(ok=True).to_dict(), ensure_ascii=False)
 
@@ -217,6 +222,33 @@ class WebBackend(QObject):
             AckResult(ok=False, message="Annulation non implémentée (v0).").to_dict(),
             ensure_ascii=False,
         )
+
+    @Slot(result=str)
+    def getLogFilePath(self) -> str:
+        from bridge_contract.models import LogFilePathResult
+        from logging_setup import get_log_file_path
+
+        path = get_log_file_path()
+        try:
+            resolved = str(path.resolve())
+        except OSError:
+            resolved = str(path)
+        return json.dumps(LogFilePathResult(path=resolved).to_dict(), ensure_ascii=False)
+
+    @Slot(result=str)
+    def openLogFile(self) -> str:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        from logging_setup import get_log_file_path
+
+        path = get_log_file_path()
+        try:
+            target = str(path.resolve())
+        except OSError:
+            target = str(path)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(target))
+        return json.dumps(AckResult(ok=True).to_dict(), ensure_ascii=False)
 
     @Slot(str, result=str)
     def getInspectorPreview(self, source_path: str) -> str:
@@ -466,16 +498,30 @@ class WebBackend(QObject):
         self._emit_queue_updated()
 
     def _merge_summary_records(self, summary: ConversionSummary) -> None:
-        """Fusionne le résumé worker dans la file (ordre conservé, chemins résolus)."""
+        """Fusionne le résumé worker dans la file (ordre du lot, chemins UI conservés)."""
         from bridge_contract.inspector_helpers import _path_key
 
-        incoming = {_path_key(r.source_path): r for r in summary.records}
-        merged: list[FileConversionRecord] = []
-        for old in self._queue.records():
+        queue_records = self._queue.records()
+        incoming = list(summary.records)
+        # Même cardinalité que le lot lancé : alignement par index (comme l'UI Qt).
+        if len(incoming) == len(queue_records) and queue_records:
+            merged = [
+                replace(new_rec, source_path=old.source_path)
+                for old, new_rec in zip(queue_records, incoming, strict=True)
+            ]
+            self._queue.set_records(merged)
+            return
+
+        by_key = {_path_key(r.source_path): r for r in incoming}
+        merged = []
+        for old in queue_records:
             key = _path_key(old.source_path)
-            rec = incoming.pop(key, None)
-            merged.append(rec if rec is not None else old)
-        merged.extend(incoming.values())
+            rec = by_key.pop(key, None)
+            if rec is None:
+                by_name = [r for r in incoming if r.source_path.name == old.source_path.name]
+                rec = by_name[0] if len(by_name) == 1 else None
+            merged.append(replace(rec, source_path=old.source_path) if rec is not None else old)
+        merged.extend(by_key.values())
         self._queue.set_records(merged)
 
     def _apply_progress(self, index: int, total: int, label: str, percent: float) -> None:
@@ -483,12 +529,16 @@ class WebBackend(QObject):
         if total <= 0 or not records:
             return
         rec = None
-        for candidate in records:
-            if candidate.source_path.name == label:
-                rec = candidate
-                break
+        if total == len(records) and records:
+            row = min(max(index, 0), len(records) - 1)
+            rec = records[row]
         if rec is None:
-            row = index if index < len(records) else len(records) - 1
+            for candidate in records:
+                if candidate.source_path.name == label:
+                    rec = candidate
+                    break
+        if rec is None and records:
+            row = min(max(index, 0), len(records) - 1)
             rec = records[row]
         rec.progress_percent = max(0.0, min(1.0, percent))
         if rec.status == ConversionStatus.QUEUED:
@@ -499,15 +549,29 @@ class WebBackend(QObject):
 
     def _apply_finished(self, summary: object) -> None:
         if not isinstance(summary, ConversionSummary):
-            self.logEmitted.emit("ERROR", "Résumé de conversion invalide.")
+            self.logEmitted.emit(
+                "ERROR",
+                f"Résumé de conversion invalide ({type(summary).__name__}).",
+            )
             return
         self._merge_summary_records(summary)
-        dto = summary_dto_from_summary(summary)
+        merged = self._queue.records()
+        dto = summary_dto_from_summary(
+            ConversionSummary(
+                started_at=summary.started_at,
+                finished_at=summary.finished_at,
+                output_dir=summary.output_dir,
+                records=merged,
+                unsupported_skipped=summary.unsupported_skipped,
+                warnings=summary.warnings,
+                pandoc_available=summary.pandoc_available,
+            )
+        )
         event = ConversionFinishedEvent(summary=dto)
         from converter import SUCCESS_STATUSES, ConversionStatus
 
-        ok = sum(1 for r in summary.records if r.status in SUCCESS_STATUSES)
-        err = sum(1 for r in summary.records if r.status == ConversionStatus.ERROR)
+        ok = sum(1 for r in merged if r.status in SUCCESS_STATUSES)
+        err = sum(1 for r in merged if r.status == ConversionStatus.ERROR)
         self.logEmitted.emit(
             "INFO",
             f"Conversion terminée : {ok} réussi(s), {err} erreur(s).",
@@ -545,11 +609,13 @@ class _WorkerBridgeSink(QObject):
 
 
 def _configure_web_settings(view: QWebEngineView) -> None:
-    from PySide6.QtWebEngineCore import QWebEngineSettings
+    from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
 
     settings = view.page().settings()
     settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
     settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, False)
+    # Évite de garder un ancien bundle JS après ``npm run build``.
+    view.page().profile().setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
 
 
 def _register_web_channel(view: QWebEngineView, backend: WebBackend) -> None:

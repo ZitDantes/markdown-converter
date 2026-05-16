@@ -4,6 +4,8 @@ type FooterBarProps = {
   doneCount: number;
   canConvert: boolean;
   bridgeReady: boolean;
+  journalOpen: boolean;
+  onToggleJournal: () => void;
   onConvert: () => void;
 };
 
@@ -13,18 +15,21 @@ export function FooterBar({
   doneCount,
   canConvert,
   bridgeReady,
+  journalOpen,
+  onToggleJournal,
   onConvert,
 }: FooterBarProps) {
   const pct = Math.round(batchPercent * 100);
-  const queued = Math.max(0, itemCount - doneCount);
   const statusLabel =
     itemCount === 0
       ? "Ajoutez des fichiers pour commencer"
-      : queued > 0
-        ? `${queued} en attente`
-        : doneCount > 0
-          ? "Terminé"
-          : "Prêt";
+      : doneCount >= itemCount && itemCount > 0
+        ? "Terminé"
+        : pct > 0 && pct < 100
+          ? "Conversion en cours…"
+          : doneCount > 0
+            ? "Terminé"
+            : "Prêt";
 
   return (
     <footer className="footer-bar">
@@ -44,6 +49,15 @@ export function FooterBar({
           <span className="footer-bar__fill" style={{ width: `${pct}%` }} />
         </div>
       </div>
+      <button
+        type="button"
+        className={`btn btn--sm btn--ghost footer-bar__journal${journalOpen ? " footer-bar__journal--active" : ""}`}
+        aria-pressed={journalOpen}
+        title="Afficher ou masquer le journal de conversion"
+        onClick={onToggleJournal}
+      >
+        Journal
+      </button>
       <button
         type="button"
         className="btn btn--primary btn--lg"

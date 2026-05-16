@@ -7,6 +7,10 @@ import {
   qtInvoke,
 } from "@shared/bridge-contract";
 
+function parseBridgeJson<T>(raw: string | T): T {
+  return parseJson<T>(raw);
+}
+
 export type { QueueState, ProgressEvent, WebBackendBridge };
 
 declare const QWebChannel: new (
@@ -33,7 +37,7 @@ export async function connectBackend(): Promise<WebBackendBridge> {
 
 export async function fetchQueueState(backend: WebBackendBridge): Promise<QueueState> {
   const raw = await qtInvoke(() => backend.getQueueState());
-  return parseJson<QueueState>(raw);
+  return parseBridgeJson<QueueState>(raw);
 }
 
 export async function pingBackend(backend: WebBackendBridge, message: string): Promise<string> {
