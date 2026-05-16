@@ -11,6 +11,19 @@ from __future__ import annotations
 from pathlib import Path
 
 from converter import ConversionStatus
+from utils import normalize_extension
+
+# Couleurs par format — design_handoff_ui_refonte/README.md
+_FORMAT_ACCENT_HEX: dict[str, str] = {
+    ".docx": "#2b6cb0",
+    ".pdf": "#c0392b",
+    ".pptx": "#d35400",
+    ".xlsx": "#1e8449",
+    ".html": "#6b46c1",
+    ".htm": "#6b46c1",
+    ".txt": "#4a5568",
+}
+_DEFAULT_FORMAT_HEX = "#4a5568"
 
 
 def file_byte_size(path: Path) -> int:
@@ -57,3 +70,15 @@ def conversion_status_label_fr(status: ConversionStatus) -> str:
 def format_source_file_size(path: Path) -> str:
     """Taille du fichier source pour affichage dans l'UI (o, Ko, …)."""
     return format_byte_size(file_byte_size(path))
+
+
+def format_accent_hex(ext: str) -> str:
+    """Code couleur hex pour une extension (ex. ``.docx``), partagé Qt + web."""
+    normalized = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+    return _FORMAT_ACCENT_HEX.get(normalized, _DEFAULT_FORMAT_HEX)
+
+
+def format_monogram_for_path(path: Path) -> str:
+    """Monogramme court affiché dans la colonne format (ex. ``DOCX``)."""
+    ext = normalize_extension(path).lstrip(".")
+    return (ext[:4] or "?").upper()

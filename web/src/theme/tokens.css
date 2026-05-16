@@ -37,6 +37,8 @@
   --mc-radius-card: 10px;
   --mc-radius-button: 6px;
   --mc-inspector-width: 380px;
+  --mc-progress-queued: #cfd4dc;
+  --mc-progress-ok: #34a85a;
 }
 
 [data-theme="dark"] {
@@ -69,4 +71,6 @@
   --mc-pandoc: #7eb3ff;
   --mc-shadow-window: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 14px 34px rgba(0, 0, 0, 0.35);
   --mc-inset-surface: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --mc-progress-queued: #4a5163;
+  --mc-progress-ok: #3a8f5c;
 }

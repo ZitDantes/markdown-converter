@@ -4,6 +4,7 @@ import { FooterBar } from "./components/layout/FooterBar";
 import { InspectorPanel } from "./components/layout/InspectorPanel";
 import { LogDrawer } from "./components/layout/LogDrawer";
 import { MainColumn } from "./components/layout/MainColumn";
+import { ConversionQueue } from "./components/queue/ConversionQueue";
 import { useTheme } from "./theme/useTheme";
 import {
   connectBackend,
@@ -13,7 +14,7 @@ import {
   type QueueState,
   type WebBackendBridge,
 } from "./bridge";
-import { parseJson, qtInvoke } from "@shared/bridge-contract";
+import { parseJson, qtInvoke, type AckResult } from "@shared/bridge-contract";
 
 type BridgeStatus = "loading" | "ready" | "error";
 type InspectorTab = "preview" | "output" | "details";
@@ -22,43 +23,6 @@ function countDone(items: QueueState["items"]): number {
   return items.filter((i) =>
     ["success", "success_review", "success_fallback"].includes(i.status),
   ).length;
-}
-
-function QueueListBody({
-  items,
-  selectedPath,
-  onSelect,
-}: {
-  items: QueueState["items"];
-  selectedPath: string | null;
-  onSelect: (path: string) => void;
-}) {
-  if (items.length === 0) {
-    return (
-      <p className="queue-empty">
-        Glissez-déposez des fichiers ou utilisez Fichiers / Dossier (parité DnD — PLO-53).
-      </p>
-    );
-  }
-
-  return (
-    <ul className="queue-list">
-      {items.map((item) => {
-        const name = item.sourcePath.split("/").pop() ?? item.sourcePath;
-        const selected = item.sourcePath === selectedPath;
-        return (
-          <li
-            key={item.sourcePath}
-            className={`queue-list__item${selected ? " queue-list__item--selected" : ""}`}
-            onClick={() => onSelect(item.sourcePath)}
-          >
-            <div className="queue-list__name">{name}</div>
-            <div className="queue-list__status">{item.statusLabel}</div>
-          </li>
-        );
-      })}
-    </ul>
-  );
 }
 
 export function App() {
@@ -108,6 +72,11 @@ export function App() {
         b.queueUpdated?.connect((queueJson) => {
           const state = parseJson<QueueState>(queueJson);
           setQueue(state);
+          setSelectedPath((prev) => {
+            if (state.items.length === 0) return null;
+            if (prev && state.items.some((i) => i.sourcePath === prev)) return prev;
+            return state.items[0]?.sourcePath ?? null;
+          });
         });
         b.conversionFinished?.connect((summaryJson) => {
           const ev = parseJson<{ summary: { records: { statusLabel: string }[] } }>(summaryJson);
@@ -139,6 +108,8 @@ export function App() {
   const bridgeReady = status === "ready" && backend !== null;
   const items = queue?.items ?? [];
   const doneCount = useMemo(() => countDone(items), [items]);
+  const isConverting = items.some((i) => i.status === "processing");
+  const queueActionsDisabled = !bridgeReady || isConverting;
 
   const onPickFiles = async () => {
     if (!backend) return;
@@ -180,6 +151,18 @@ export function App() {
     pushLog("[INFO] file vidée");
   };
 
+  const onRemoveItem = async (sourcePath: string) => {
+    if (!backend) return;
+    const raw = await qtInvoke(() => backend.removeQueueItem(sourcePath));
+    const ack = parseJson<AckResult>(raw);
+    if (!ack.ok) {
+      pushLog(`[WARN] ${ack.message ?? "Retrait impossible"}`);
+      return;
+    }
+    await refreshQueue(backend);
+    pushLog("[INFO] fichier retiré de la file");
+  };
+
   return (
     <AppShell
       isDark={isDark}
@@ -195,10 +178,14 @@ export function App() {
           onClear={() => void onClear()}
           onPickOutput={() => void onPickOutput()}
           queueList={
-            <QueueListBody
+            <ConversionQueue
               items={items}
+              queue={queue}
               selectedPath={selectedPath}
+              isDark={isDark}
+              actionsDisabled={queueActionsDisabled}
               onSelect={setSelectedPath}
+              onRemove={(path) => void onRemoveItem(path)}
             />
           }
         />

@@ -52,3 +52,29 @@ def test_start_worker_keeps_sink_reference(qt_app: object, tmp_path: object) -> 
     assert thread is not None
     thread.quit()
     assert thread.wait(10_000)
+
+
+def test_remove_queue_item(qt_app: object, tmp_path: object) -> None:
+    from converter import ConversionStatus, FileConversionRecord
+    from ui_web_shell import WebBackend
+
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("a", encoding="utf-8")
+    b.write_text("b", encoding="utf-8")
+
+    backend = WebBackend()
+    backend._queue.set_records(
+        [
+            FileConversionRecord(source_path=a, status=ConversionStatus.QUEUED),
+            FileConversionRecord(source_path=b, status=ConversionStatus.QUEUED),
+        ]
+    )
+
+    raw = json.loads(backend.removeQueueItem(str(a)))
+    assert raw["ok"] is True
+
+    state = json.loads(backend.getQueueState())
+    assert len(state["items"]) == 1
+    assert state["items"][0]["sourcePath"] == str(b)
+    assert state["items"][0]["fileName"] == "b.txt"

@@ -157,6 +157,24 @@ class WebBackend(QObject):
         return json.dumps(ClearQueueResult(clearedCount=n).to_dict(), ensure_ascii=False)
 
     @Slot(str, result=str)
+    def removeQueueItem(self, source_path: str) -> str:
+        if self._worker_thread is not None:
+            return json.dumps(
+                AckResult(ok=False, message="Conversion en cours — action impossible.").to_dict(),
+                ensure_ascii=False,
+            )
+        target = Path(source_path)
+        records = [r for r in self._queue.records() if r.source_path != target]
+        if len(records) == len(self._queue.records()):
+            return json.dumps(
+                AckResult(ok=False, message="Fichier introuvable dans la file.").to_dict(),
+                ensure_ascii=False,
+            )
+        self._queue.set_records(records)
+        self._emit_queue_updated()
+        return json.dumps(AckResult(ok=True).to_dict(), ensure_ascii=False)
+
+    @Slot(str, result=str)
     def startConversion(self, command_json: str) -> str:
         if self._worker_thread is not None:
             return json.dumps(
@@ -199,17 +217,22 @@ class WebBackend(QObject):
         return added
 
     def _queue_state_json(self) -> str:
-        items = [file_queue_item_from_record(r) for r in self._queue.records()]
+        from ui_conversion_display import file_byte_size, format_byte_size
+
+        records = self._queue.records()
+        items = [file_queue_item_from_record(r) for r in records]
+        total_bytes = sum(file_byte_size(r.source_path) for r in records)
         can_start = (
             self._output_dir is not None
             and bool(items)
             and self._worker_thread is None
-            and all(is_supported_path(r.source_path) for r in self._queue.records())
+            and all(is_supported_path(r.source_path) for r in records)
         )
         state = QueueState(
             items=items,
             outputDir=str(self._output_dir) if self._output_dir else None,
             canStartConversion=can_start,
+            totalSizeLabel=format_byte_size(total_bytes),
         )
         return json.dumps(state.to_dict(), ensure_ascii=False)
 
