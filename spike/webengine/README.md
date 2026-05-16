@@ -104,6 +104,10 @@ sudo apt-get install -y libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 \
 | `static_qrc/` | Copie embarquée dans `resources.qrc` |
 | `resources_rc.py` | Module généré par `pyside6-rcc` |
 
+## Suite (PLO-45+)
+
+Contrat pont JS ↔ Python : [ADR 0001](../../docs/adr/0001-contrat-pont-webchannel-js-python.md), types `web/shared/bridge-contract.ts` et `bridge_contract/`.
+
 ## Critères d’acceptation PLO-44
 
 - [x] PoC documenté avec instructions de repro

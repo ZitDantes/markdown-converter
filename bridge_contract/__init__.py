@@ -1,0 +1,39 @@
+"""Contrat pont WebChannel v0 (PLO-45) — DTOs et sérialisation JSON."""
+
+from bridge_contract.models import (
+    SCHEMA_VERSION,
+    AckResult,
+    ClearQueueResult,
+    ConversionFinishedEvent,
+    ConversionSummaryDto,
+    FileQueueItem,
+    PickFilesResult,
+    PickFolderResult,
+    ProgressEvent,
+    QueueState,
+    SetOutputDirResult,
+    StartConversionCommand,
+    dumps_json,
+    file_queue_item_from_record,
+    loads_json,
+    summary_dto_from_summary,
+)
+
+__all__ = [
+    "SCHEMA_VERSION",
+    "AckResult",
+    "ClearQueueResult",
+    "ConversionFinishedEvent",
+    "ConversionSummaryDto",
+    "FileQueueItem",
+    "PickFilesResult",
+    "PickFolderResult",
+    "ProgressEvent",
+    "QueueState",
+    "SetOutputDirResult",
+    "StartConversionCommand",
+    "dumps_json",
+    "file_queue_item_from_record",
+    "loads_json",
+    "summary_dto_from_summary",
+]
