@@ -1,0 +1,123 @@
+import type {
+  ConversionFinishedEvent,
+  ConversionStatusValue,
+  ConversionSummaryDto,
+  FileQueueItem,
+  QueueState,
+  WebBackendBridge,
+} from "@shared/bridge-contract";
+import { parseJson, qtInvoke } from "@shared/bridge-contract";
+
+const TERMINAL: ConversionStatusValue[] = [
+  "success",
+  "success_review",
+  "success_fallback",
+  "error",
+  "empty",
+  "unsupported",
+];
+
+export function pathKey(sourcePath: string): string {
+  return sourcePath;
+}
+
+export function parseJsonValue<T>(raw: string | T): T {
+  if (typeof raw === "string") {
+    return parseJson<T>(raw);
+  }
+  return raw;
+}
+
+export function isTerminalStatus(status: ConversionStatusValue): boolean {
+  return TERMINAL.includes(status);
+}
+
+export function computeBatchPercent(state: QueueState): number {
+  if (state.items.length === 0) return 0;
+  const sum = state.items.reduce((acc, item) => acc + item.progressPercent, 0);
+  return Math.max(0, Math.min(1, sum / state.items.length));
+}
+
+const SUCCESS: ConversionStatusValue[] = ["success", "success_review", "success_fallback"];
+
+export function countConversionResults(items: FileQueueItem[]): {
+  ok: number;
+  err: number;
+} {
+  let ok = 0;
+  let err = 0;
+  for (const item of items) {
+    if (SUCCESS.includes(item.status)) {
+      ok += 1;
+    } else if (item.status === "error" || item.status === "empty") {
+      err += 1;
+    }
+  }
+  return { ok, err };
+}
+
+/**
+ * Fusionne les enregistrements du résumé de conversion dans l'état de file actuel.
+ */
+export function mergeSummaryIntoQueue(
+  queue: QueueState,
+  summary: ConversionSummaryDto,
+): QueueState {
+  const byPath = new Map(summary.records.map((r) => [pathKey(r.sourcePath), r]));
+  const merged: FileQueueItem[] = queue.items.map((item) => {
+    const hit = byPath.get(pathKey(item.sourcePath));
+    return hit ?? item;
+  });
+  for (const rec of summary.records) {
+    const key = pathKey(rec.sourcePath);
+    if (!merged.some((i) => pathKey(i.sourcePath) === key)) {
+      merged.push(rec);
+    }
+  }
+  return { ...queue, items: merged };
+}
+
+export function parseConversionFinishedPayload(
+  raw: string | ConversionFinishedEvent,
+): ConversionFinishedEvent {
+  return parseJsonValue<ConversionFinishedEvent>(raw);
+}
+
+/**
+ * Interroge ``getQueueState`` jusqu'à la fin du lot (contournement si les signaux
+ * QWebChannel n'alimentent pas React de façon fiable).
+ */
+export async function pollQueueUntilIdle(
+  backend: WebBackendBridge,
+  onUpdate: (state: QueueState) => void,
+  options?: { intervalMs?: number; maxWaitMs?: number },
+): Promise<QueueState> {
+  const intervalMs = options?.intervalMs ?? 200;
+  const maxWaitMs = options?.maxWaitMs ?? 300_000;
+  const started = Date.now();
+  let last: QueueState | null = null;
+
+  while (Date.now() - started < maxWaitMs) {
+    const raw = await qtInvoke(() => backend.getQueueState());
+    const state = parseJsonValue<QueueState>(raw);
+    last = state;
+    onUpdate(state);
+
+    const anyTerminal = state.items.some((i) => isTerminalStatus(i.status));
+    const stillRunning = state.items.some(
+      (i) => i.status === "queued" || i.status === "processing",
+    );
+    if (anyTerminal && !stillRunning) {
+      return state;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  if (last) {
+    return last;
+  }
+  const raw = await qtInvoke(() => backend.getQueueState());
+  const state = parseJsonValue<QueueState>(raw);
+  onUpdate(state);
+  return state;
+}

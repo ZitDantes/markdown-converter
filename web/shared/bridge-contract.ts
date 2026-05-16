@@ -177,8 +177,12 @@ export function qtInvoke<T>(callable: () => QtInvokeResult<T>): Promise<T> {
   return Promise.resolve(value);
 }
 
-export function parseJson<T>(raw: string): T {
-  return JSON.parse(raw) as T;
+/** Parse une réponse pont (chaîne JSON ou objet déjà désérialisé par QWebChannel). */
+export function parseJson<T>(raw: string | T): T {
+  if (typeof raw === "string") {
+    return JSON.parse(raw) as T;
+  }
+  return raw;
 }
 
 /** Objet exposé par QWebChannel (méthodes = commandes, propriétés = signaux) */

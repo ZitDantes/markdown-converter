@@ -20,15 +20,16 @@ export function FooterBar({
   onConvert,
 }: FooterBarProps) {
   const pct = Math.round(batchPercent * 100);
-  const queued = Math.max(0, itemCount - doneCount);
   const statusLabel =
     itemCount === 0
       ? "Ajoutez des fichiers pour commencer"
-      : queued > 0
-        ? `${queued} en attente`
-        : doneCount > 0
-          ? "Terminé"
-          : "Prêt";
+      : doneCount >= itemCount && itemCount > 0
+        ? "Terminé"
+        : pct > 0 && pct < 100
+          ? "Conversion en cours…"
+          : doneCount > 0
+            ? "Terminé"
+            : "Prêt";
 
   return (
     <footer className="footer-bar">

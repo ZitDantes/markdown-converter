@@ -7,6 +7,14 @@ import { MainColumn } from "./components/layout/MainColumn";
 import { ConversionQueue } from "./components/queue/ConversionQueue";
 import type { ConversionMode } from "./components/toolbar/ConversionToolbar";
 import { filterQueueItems } from "./lib/queueFilters";
+import {
+  computeBatchPercent,
+  countConversionResults,
+  mergeSummaryIntoQueue,
+  parseConversionFinishedPayload,
+  parseJsonValue,
+  pollQueueUntilIdle,
+} from "./lib/queueSync";
 import { normalizeLogLevel, parseLogLine, type LogEntry } from "./lib/logJournal";
 import { useTheme } from "./theme/useTheme";
 import {
@@ -17,7 +25,7 @@ import {
   type QueueState,
   type WebBackendBridge,
 } from "./bridge";
-import { parseJson, qtInvoke, type AckResult } from "@shared/bridge-contract";
+import { parseJson, qtInvoke, type AckResult, type SetOutputDirResult } from "@shared/bridge-contract";
 
 type BridgeStatus = "loading" | "ready" | "error";
 function countDone(items: QueueState["items"]): number {
@@ -57,9 +65,9 @@ export function App() {
     [appendLog],
   );
 
-  const refreshQueue = useCallback(async (b: WebBackendBridge) => {
-    const state = await fetchQueueState(b);
+  const applyQueueSnapshot = useCallback((state: QueueState) => {
     setQueue(state);
+    setBatchPercent(computeBatchPercent(state));
     setSelectedPath((prev) => {
       if (state.items.length === 0) return null;
       if (prev && state.items.some((i) => i.sourcePath === prev)) return prev;
@@ -67,34 +75,58 @@ export function App() {
     });
   }, []);
 
+  const refreshQueue = useCallback(
+    async (b: WebBackendBridge) => {
+      const state = await fetchQueueState(b);
+      applyQueueSnapshot(state);
+    },
+    [applyQueueSnapshot],
+  );
+
   useEffect(() => {
     let cancelled = false;
+    let progressRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleQueueRefresh = (b: WebBackendBridge) => {
+      if (progressRefreshTimer !== null) {
+        clearTimeout(progressRefreshTimer);
+      }
+      progressRefreshTimer = setTimeout(() => {
+        progressRefreshTimer = null;
+        if (!cancelled) {
+          void refreshQueue(b);
+        }
+      }, 80);
+    };
 
     (async () => {
       try {
         const b = await connectBackend();
         if (cancelled) return;
-        const pong = await pingBackend(b, "démarrage");
-        pushLog(`[INFO] ping : ${pong}`);
+        await pingBackend(b, "démarrage");
+        appendLog("INFO", "Application prête.");
 
         b.logEmitted?.connect((level, message) => {
           appendLog(level, message);
         });
         b.progressUpdated?.connect((progressJson) => {
-          const ev = parseJson<ProgressEvent>(progressJson);
+          const ev = parseJsonValue<ProgressEvent>(progressJson);
           setBatchPercent(ev.batchPercent);
+          scheduleQueueRefresh(b);
         });
         b.queueUpdated?.connect((queueJson) => {
-          const state = parseJson<QueueState>(queueJson);
-          setQueue(state);
-          setSelectedPath((prev) => {
-            if (state.items.length === 0) return null;
-            if (prev && state.items.some((i) => i.sourcePath === prev)) return prev;
-            return state.items[0]?.sourcePath ?? null;
-          });
+          applyQueueSnapshot(parseJsonValue<QueueState>(queueJson));
         });
-        b.conversionFinished?.connect(() => {
+        b.conversionFinished?.connect((summaryJson) => {
           setBatchPercent(1);
+          try {
+            const ev = parseConversionFinishedPayload(summaryJson);
+            setQueue((prev) =>
+              prev ? mergeSummaryIntoQueue(prev, ev.summary) : prev,
+            );
+          } catch {
+            /* repli : snapshot complet via le pont */
+          }
           void refreshQueue(b);
         });
         b.conversionFailed?.connect(() => {
@@ -107,9 +139,8 @@ export function App() {
           const rawPath = await qtInvoke(() => b.getLogFilePath());
           const pathDto = parseJson<{ path: string }>(rawPath);
           setLogFilePath(pathDto.path);
-          appendLog("INFO", `Fichier de log : ${pathDto.path}`);
         } catch {
-          appendLog("INFO", "Fichier de log : indisponible");
+          setLogFilePath(null);
         }
         setStatus("ready");
       } catch (e) {
@@ -122,8 +153,11 @@ export function App() {
 
     return () => {
       cancelled = true;
+      if (progressRefreshTimer !== null) {
+        clearTimeout(progressRefreshTimer);
+      }
     };
-  }, [appendLog, pushLog, refreshQueue]);
+  }, [appendLog, applyQueueSnapshot, pushLog, refreshQueue]);
 
   const bridgeReady = status === "ready" && backend !== null;
   const items = queue?.items ?? [];
@@ -171,7 +205,12 @@ export function App() {
   const onPickOutput = async () => {
     if (!backend) return;
     const raw = await qtInvoke(() => backend.pickOutputDir());
-    pushLog(`[INFO] sortie : ${raw}`);
+    const result = parseJson<SetOutputDirResult>(raw);
+    if (result.ok && result.outputDir) {
+      appendLog("INFO", `Dossier de sortie : ${result.outputDir}`);
+    } else if (result.errorMessage && result.errorMessage !== "Annulé") {
+      appendLog("WARNING", result.errorMessage);
+    }
     await refreshQueue(backend);
   };
 
@@ -182,9 +221,19 @@ export function App() {
       schemaVersion: "0",
       useConversionFallback: !strictMode,
     });
-    await qtInvoke(() => backend.startConversion(cmd));
+    const rawAck = await qtInvoke(() => backend.startConversion(cmd));
+    const ack = parseJsonValue<AckResult>(rawAck);
+    if (!ack.ok) {
+      appendLog("WARNING", ack.message ?? "Impossible de démarrer la conversion.");
+      return;
+    }
     const modeLabel = strictMode ? "Strict" : "Standard";
-    pushLog(`[INFO] conversion démarrée (mode ${modeLabel})`);
+    const fileCount = items.length;
+    appendLog("INFO", `Conversion démarrée (${fileCount} fichier(s), mode ${modeLabel})…`);
+    const finalState = await pollQueueUntilIdle(backend, applyQueueSnapshot);
+    const { ok, err } = countConversionResults(finalState.items);
+    appendLog("INFO", `Conversion terminée : ${ok} réussi(s), ${err} erreur(s).`);
+    setBatchPercent(1);
   };
 
   const onClear = async () => {

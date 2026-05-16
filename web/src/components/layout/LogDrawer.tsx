@@ -69,7 +69,12 @@ export function LogDrawer({ entries, open, onToggle, onOpenLogFile, logFilePath 
               ))}
             </div>
             {onOpenLogFile && (
-              <button type="button" className="log-drawer__open-file" onClick={onOpenLogFile}>
+              <button
+                type="button"
+                className="log-drawer__open-file"
+                title={logFilePath ?? undefined}
+                onClick={onOpenLogFile}
+              >
                 Ouvrir le fichier de log
               </button>
             )}
@@ -78,11 +83,6 @@ export function LogDrawer({ entries, open, onToggle, onOpenLogFile, logFilePath 
       </div>
       {open && (
         <div className="log-drawer__body">
-          {logFilePath && (
-            <p className="log-drawer__path" title={logFilePath}>
-              Fichier de log : {logFilePath}
-            </p>
-          )}
           <pre className="log-drawer__log" aria-live="polite">
             {visible.length > 0 ? (
               visible.map((entry, i) => (
