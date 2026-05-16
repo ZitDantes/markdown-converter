@@ -1,6 +1,7 @@
 """Contrat pont WebChannel v0 (PLO-45) — DTOs et sérialisation JSON."""
 
 from bridge_contract.models import (
+    BACKEND_OBJECT_NAME,
     SCHEMA_VERSION,
     AckResult,
     ClearQueueResult,
@@ -20,6 +21,7 @@ from bridge_contract.models import (
 )
 
 __all__ = [
+    "BACKEND_OBJECT_NAME",
     "SCHEMA_VERSION",
     "AckResult",
     "ClearQueueResult",

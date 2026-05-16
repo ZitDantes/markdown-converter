@@ -118,6 +118,8 @@ export interface WebBackendBridge {
   ping(message: string): QtInvokeResult<string>;
   pickFiles(): QtInvokeResult<string>;
   pickFolder(): QtInvokeResult<string>;
+  /** Extension PLO-46 : sélecteur natif du dossier de sortie uniquement */
+  pickOutputDir(): QtInvokeResult<string>;
   setOutputDir(path: string): QtInvokeResult<string>;
   getQueueState(): QtInvokeResult<string>;
   clearQueue(): QtInvokeResult<string>;

@@ -11,6 +11,11 @@ les dépendances optionnelles ::
 Spike WebEngine (PLO-44) ::
 
     MARKDOWN_CONVERTER_UI=web-spike python3 main.py
+
+UI web (PLO-46) ::
+
+    cd web && npm ci && npm run build
+    MARKDOWN_CONVERTER_UI=web python3 main.py
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ UI_ENV_VAR = "MARKDOWN_CONVERTER_UI"
 UI_TK = "tk"
 UI_QT = "qt"
 UI_WEB_SPIKE = "web-spike"
+UI_WEB = "web"
 
 
 def _fail_python_version() -> None:
@@ -79,6 +85,8 @@ def _resolve_ui_choice() -> str:
     raw = os.environ.get(UI_ENV_VAR, "").strip().lower()
     if raw == UI_WEB_SPIKE:
         return UI_WEB_SPIKE
+    if raw == UI_WEB:
+        return UI_WEB
     return UI_QT if raw == UI_QT else UI_TK
 
 
@@ -109,6 +117,13 @@ def _run_web_spike_ui() -> None:
     run_web_spike()
 
 
+def _run_web_ui() -> None:
+    """Lance le shell UI web (PLO-46). Quitte le processus."""
+    from ui_web_shell import run_app as run_web_app
+
+    run_web_app()
+
+
 def main() -> None:
     if sys.version_info < MIN_PYTHON:
         _fail_python_version()
@@ -124,6 +139,17 @@ def main() -> None:
             log_path,
         )
         _run_web_spike_ui()
+        return
+
+    if ui_choice == UI_WEB:
+        from logging_setup import get_logger, setup_logging
+
+        log_path = setup_logging()
+        get_logger("main").info(
+            "Démarrage UI web (PLO-46, logs : %s).",
+            log_path,
+        )
+        _run_web_ui()
         return
 
     if ui_choice == UI_QT:
