@@ -22,6 +22,7 @@ Captures de référence (handoff design) : dossier [`design_handoff_ui_refonte/s
 
 | Fichier | Public |
 |---------|--------|
+| [ADR — décisions d’architecture](adr/README.md) | Contrat pont UI web ↔ Python (PLO-45) |
 | [LISEZMOI_COLLEGUES.txt](LISEZMOI_COLLEGUES.txt) | Texte livré dans l’archive ZIP de distribution macOS |
 | [CHANGELOG.md](../CHANGELOG.md) | Historique des versions |
 | [README.md](../README.md) | Vue d’ensemble technique et développeurs |
