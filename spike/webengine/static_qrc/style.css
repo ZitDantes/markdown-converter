@@ -1,0 +1,31 @@
+/* Feuille embarquée (qrc) pour valider les assets packagés */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 2rem;
+  background: #fff8f0;
+  color: #2e1a1a;
+}
+
+.meta {
+  color: #664;
+}
+
+#status {
+  font-weight: 600;
+}
+
+.ok {
+  color: #9a4d0a;
+}
+
+#log {
+  background: #fff;
+  border: 1px solid #ddb;
+  padding: 0.75rem;
+  min-height: 4rem;
+}
+
+button {
+  margin: 0.5rem 0 1rem;
+  padding: 0.4rem 0.9rem;
+}

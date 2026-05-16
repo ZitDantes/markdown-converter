@@ -7,6 +7,10 @@ les dépendances optionnelles ::
 
     pip install -r requirements-qt.txt
     MARKDOWN_CONVERTER_UI=qt python3 main.py
+
+Spike WebEngine (PLO-44) ::
+
+    MARKDOWN_CONVERTER_UI=web-spike python3 main.py
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ MIN_PYTHON = (3, 10)
 UI_ENV_VAR = "MARKDOWN_CONVERTER_UI"
 UI_TK = "tk"
 UI_QT = "qt"
+UI_WEB_SPIKE = "web-spike"
 
 
 def _fail_python_version() -> None:
@@ -72,6 +77,8 @@ def _fail_tkinter(exc: BaseException | None = None) -> None:
 def _resolve_ui_choice() -> str:
     """Lit ``MARKDOWN_CONVERTER_UI`` ; valeurs ignorées (typo, vide) → ``tk``."""
     raw = os.environ.get(UI_ENV_VAR, "").strip().lower()
+    if raw == UI_WEB_SPIKE:
+        return UI_WEB_SPIKE
     return UI_QT if raw == UI_QT else UI_TK
 
 
@@ -95,11 +102,29 @@ def _run_qt_ui() -> bool:
     return True
 
 
+def _run_web_spike_ui() -> None:
+    """Lance le spike PLO-44 (WebEngine + QWebChannel). Quitte le processus."""
+    from spike.webengine.app import run_app as run_web_spike
+
+    run_web_spike()
+
+
 def main() -> None:
     if sys.version_info < MIN_PYTHON:
         _fail_python_version()
 
     ui_choice = _resolve_ui_choice()
+
+    if ui_choice == UI_WEB_SPIKE:
+        from logging_setup import get_logger, setup_logging
+
+        log_path = setup_logging()
+        get_logger("main").info(
+            "Démarrage spike WebEngine (PLO-44, logs : %s).",
+            log_path,
+        )
+        _run_web_spike_ui()
+        return
 
     if ui_choice == UI_QT:
         from logging_setup import get_logger, setup_logging

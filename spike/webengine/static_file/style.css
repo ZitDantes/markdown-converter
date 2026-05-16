@@ -1,0 +1,31 @@
+/* Feuille locale pour valider le chargement d'assets en file: */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 2rem;
+  background: #f4f8ff;
+  color: #1a1a2e;
+}
+
+.meta {
+  color: #555;
+}
+
+#status {
+  font-weight: 600;
+}
+
+.ok {
+  color: #0a7a3b;
+}
+
+#log {
+  background: #fff;
+  border: 1px solid #ccd;
+  padding: 0.75rem;
+  min-height: 4rem;
+}
+
+button {
+  margin: 0.5rem 0 1rem;
+  padding: 0.4rem 0.9rem;
+}
