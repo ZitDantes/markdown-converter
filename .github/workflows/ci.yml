@@ -1,5 +1,6 @@
-# CI : lint (ruff), format (ruff format --check) et tests (pytest) sur chaque PR
-# et sur les pushes vers main. Aligné sur PLO-8 (ruff uniquement, pas black).
+# CI : lint (ruff), format (ruff format --check), tests (pytest) et build front
+# (npm ci && vite build) sur chaque PR et push vers main.
+# Python : PLO-8 (ruff uniquement, pas black). Front : PLO-47.
 
 name: CI
 
@@ -68,3 +69,24 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: pytest
+
+  web:
+    name: build front (Node.js 20)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build front Vite
+        run: ./scripts/build_web.sh
+
+      - name: Vérifier web/dist
+        run: test -f web/dist/index.html

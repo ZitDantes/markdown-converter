@@ -322,9 +322,10 @@ Sur chaque **pull request** et sur chaque **push** vers `main`, le workflow [`.g
 
 - **ruff check** (lint) ;
 - **ruff format --check** (formatage, sans modifier les fichiers) ;
-- **pytest** (toute la suite).
+- **pytest** (toute la suite) ;
+- **build front** (`./scripts/build_web.sh`, Node.js 20, dossier `web/`) — job parallèle **PLO-47**.
 
-Les versions **Python 3.10, 3.11 et 3.12** sont testées sur **Ubuntu** (matrice). Le badge CI en tête de ce fichier renvoie vers la dernière exécution sur la branche par défaut.
+Les versions **Python 3.10, 3.11 et 3.12** sont testées sur **Ubuntu** (matrice Python). Le front est compilé sur **Ubuntu** avec **Node.js 20**. Le badge CI en tête de ce fichier renvoie vers la dernière exécution sur la branche par défaut.
 
 > **Note** : une ancienne version du backlog mentionnait *black* ; le projet utilise uniquement **ruff** pour le lint et le format (cf. section [Lint et formatage (ruff)](#lint-et-formatage-ruff)).
 
