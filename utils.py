@@ -84,6 +84,24 @@ def merge_file_lists(
     return supported, unsupported
 
 
+def find_existing_output_md(output_dir: Path, source_stem: str) -> Path | None:
+    """Retourne un fichier ``.md`` déjà présent pour ce nom source, ou ``None``."""
+    try:
+        root = output_dir.resolve()
+    except OSError:
+        root = output_dir
+    if not root.is_dir():
+        return None
+    base = _safe_stem(source_stem)
+    exact = root / f"{base}.md"
+    if exact.is_file():
+        return exact
+    for candidate in sorted(root.glob(f"{base}_*.md")):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def unique_output_md_path(output_dir: Path, source_stem: str) -> Path:
     """
     Retourne un chemin ``output_dir / {stem}.md`` sans écraser un fichier existant
