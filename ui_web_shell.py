@@ -218,6 +218,33 @@ class WebBackend(QObject):
             ensure_ascii=False,
         )
 
+    @Slot(result=str)
+    def getLogFilePath(self) -> str:
+        from bridge_contract.models import LogFilePathResult
+        from logging_setup import get_log_file_path
+
+        path = get_log_file_path()
+        try:
+            resolved = str(path.resolve())
+        except OSError:
+            resolved = str(path)
+        return json.dumps(LogFilePathResult(path=resolved).to_dict(), ensure_ascii=False)
+
+    @Slot(result=str)
+    def openLogFile(self) -> str:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        from logging_setup import get_log_file_path
+
+        path = get_log_file_path()
+        try:
+            target = str(path.resolve())
+        except OSError:
+            target = str(path)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(target))
+        return json.dumps(AckResult(ok=True).to_dict(), ensure_ascii=False)
+
     @Slot(str, result=str)
     def getInspectorPreview(self, source_path: str) -> str:
         from bridge_contract.models import InspectorPreviewResult

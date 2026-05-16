@@ -39,6 +39,11 @@ export interface FileQueueItem {
   errorType?: string | null;
 }
 
+export interface LogFilePathResult {
+  schemaVersion: SchemaVersion;
+  path: string;
+}
+
 export interface InspectorOutputPathResult {
   schemaVersion: SchemaVersion;
   ok: boolean;
@@ -189,6 +194,8 @@ export interface WebBackendBridge {
   removeQueueItem(sourcePath: string): QtInvokeResult<string>;
   startConversion(commandJson: string): QtInvokeResult<string>;
   cancelConversion(): QtInvokeResult<string>;
+  getLogFilePath(): QtInvokeResult<string>;
+  openLogFile(): QtInvokeResult<string>;
   getInspectorPreview(sourcePath: string): QtInvokeResult<string>;
   getInspectorOutputPath(sourcePath: string): QtInvokeResult<string>;
   copyText(text: string): QtInvokeResult<string>;

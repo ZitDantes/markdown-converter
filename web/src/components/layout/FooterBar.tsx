@@ -4,6 +4,8 @@ type FooterBarProps = {
   doneCount: number;
   canConvert: boolean;
   bridgeReady: boolean;
+  journalOpen: boolean;
+  onToggleJournal: () => void;
   onConvert: () => void;
 };
 
@@ -13,6 +15,8 @@ export function FooterBar({
   doneCount,
   canConvert,
   bridgeReady,
+  journalOpen,
+  onToggleJournal,
   onConvert,
 }: FooterBarProps) {
   const pct = Math.round(batchPercent * 100);
@@ -44,6 +48,15 @@ export function FooterBar({
           <span className="footer-bar__fill" style={{ width: `${pct}%` }} />
         </div>
       </div>
+      <button
+        type="button"
+        className={`btn btn--sm btn--ghost footer-bar__journal${journalOpen ? " footer-bar__journal--active" : ""}`}
+        aria-pressed={journalOpen}
+        title="Afficher ou masquer le journal de conversion"
+        onClick={onToggleJournal}
+      >
+        Journal
+      </button>
       <button
         type="button"
         className="btn btn--primary btn--lg"

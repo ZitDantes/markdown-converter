@@ -7,6 +7,7 @@ import { MainColumn } from "./components/layout/MainColumn";
 import { ConversionQueue } from "./components/queue/ConversionQueue";
 import type { ConversionMode } from "./components/toolbar/ConversionToolbar";
 import { filterQueueItems } from "./lib/queueFilters";
+import { normalizeLogLevel, parseLogLine, type LogEntry } from "./lib/logJournal";
 import { useTheme } from "./theme/useTheme";
 import {
   connectBackend,
@@ -31,7 +32,8 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [backend, setBackend] = useState<WebBackendBridge | null>(null);
   const [queue, setQueue] = useState<QueueState | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
+  const [logFilePath, setLogFilePath] = useState<string | null>(null);
   const [batchPercent, setBatchPercent] = useState(0);
   const [conversionMode, setConversionMode] = useState<ConversionMode>("standard");
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,9 +42,20 @@ export function App() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("preview");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
 
-  const pushLog = useCallback((line: string) => {
-    setLogs((prev) => [...prev.slice(-200), line]);
+  const appendLog = useCallback((level: string, message: string) => {
+    setLogEntries((prev) => [
+      ...prev.slice(-500),
+      { level: normalizeLogLevel(level), message },
+    ]);
   }, []);
+
+  const pushLog = useCallback(
+    (line: string) => {
+      const parsed = parseLogLine(line);
+      appendLog(parsed.level, parsed.message);
+    },
+    [appendLog],
+  );
 
   const refreshQueue = useCallback(async (b: WebBackendBridge) => {
     const state = await fetchQueueState(b);
@@ -65,7 +78,7 @@ export function App() {
         pushLog(`[INFO] ping : ${pong}`);
 
         b.logEmitted?.connect((level, message) => {
-          pushLog(`[${level.toUpperCase()}] ${message}`);
+          appendLog(level, message);
         });
         b.progressUpdated?.connect((progressJson) => {
           const ev = parseJson<ProgressEvent>(progressJson);
@@ -80,21 +93,24 @@ export function App() {
             return state.items[0]?.sourcePath ?? null;
           });
         });
-        b.conversionFinished?.connect((summaryJson) => {
-          const ev = parseJson<{ summary: { records: { statusLabel: string }[] } }>(summaryJson);
-          const n = ev.summary.records.length;
-          const ok = ev.summary.records.filter((r) => r.statusLabel.startsWith("OK")).length;
-          pushLog(`[INFO] conversion terminée : ${ok}/${n} fichier(s)`);
+        b.conversionFinished?.connect(() => {
           setBatchPercent(1);
           void refreshQueue(b);
         });
-        b.conversionFailed?.connect((message) => {
-          pushLog(`[ERROR] ${message}`);
+        b.conversionFailed?.connect(() => {
           void refreshQueue(b);
         });
 
         setBackend(b);
         await refreshQueue(b);
+        try {
+          const rawPath = await qtInvoke(() => b.getLogFilePath());
+          const pathDto = parseJson<{ path: string }>(rawPath);
+          setLogFilePath(pathDto.path);
+          appendLog("INFO", `Fichier de log : ${pathDto.path}`);
+        } catch {
+          appendLog("INFO", "Fichier de log : indisponible");
+        }
         setStatus("ready");
       } catch (e) {
         if (!cancelled) {
@@ -107,7 +123,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [pushLog, refreshQueue]);
+  }, [appendLog, pushLog, refreshQueue]);
 
   const bridgeReady = status === "ready" && backend !== null;
   const items = queue?.items ?? [];
@@ -253,11 +269,25 @@ export function App() {
           doneCount={doneCount}
           canConvert={queue?.canStartConversion ?? false}
           bridgeReady={bridgeReady}
+          journalOpen={logOpen}
+          onToggleJournal={() => setLogOpen((o) => !o)}
           onConvert={() => void onConvert()}
         />
       }
       logDrawer={
-        <LogDrawer lines={logs} open={logOpen} onToggle={() => setLogOpen((o) => !o)} />
+        <LogDrawer
+          entries={logEntries}
+          open={logOpen}
+          logFilePath={logFilePath}
+          onToggle={() => setLogOpen((o) => !o)}
+          onOpenLogFile={
+            backend
+              ? () => {
+                  void qtInvoke(() => backend.openLogFile());
+                }
+              : undefined
+          }
+        />
       }
     />
   );
