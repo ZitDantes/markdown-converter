@@ -83,6 +83,8 @@ class WebBackend(QObject):
     queueUpdated = Signal(str)
     conversionFinished = Signal(str)
     conversionFailed = Signal(str)
+    dropOverlayVisible = Signal(bool)
+    pathsAdded = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -427,6 +429,31 @@ class WebBackend(QObject):
         self._emit_queue_updated()
         return added
 
+    def handle_drop_mime(self, mime: object) -> None:
+        """Traite un dépôt glisser-déposer (fichiers et dossiers, extensions supportées)."""
+        from PySide6.QtCore import QMimeData
+
+        from ui_qt_file_drop_table import supported_paths_from_mime
+
+        if not isinstance(mime, QMimeData):
+            return
+        if self._worker_thread is not None:
+            self.logEmitted.emit("WARNING", "Conversion en cours — dépôt ignoré.")
+            return
+        to_add = supported_paths_from_mime(mime)
+        if not to_add:
+            return
+        added = self._add_paths(to_add)
+        if added:
+            n = len(added)
+            label = f"{n} fichiers ajoutés" if n > 1 else "1 fichier ajouté"
+            self.logEmitted.emit("INFO", f"{label} (glisser-déposer).")
+        payload = PickFilesResult(
+            paths=[str(p) for p in added],
+            cancelled=False,
+        )
+        self.pathsAdded.emit(json.dumps(payload.to_dict(), ensure_ascii=False))
+
     def _queue_state_json(self) -> str:
         from ui_conversion_display import file_byte_size, format_byte_size
 
@@ -634,8 +661,10 @@ class WebShellWindow(QMainWindow):
         self.setWindowTitle("Markdown Converter")
         self.resize(960, 640)
 
+        from ui_web_drop import WebEngineDropView
+
         self._backend = WebBackend(self)
-        self._view = QWebEngineView(self)
+        self._view = WebEngineDropView(self._backend, self)
         _configure_web_settings(self._view)
         _register_web_channel(self._view, self._backend)
         self.setCentralWidget(self._view)

@@ -212,4 +212,8 @@ export interface WebBackendBridge {
   queueUpdated?: { connect(cb: (queueJson: string) => void): void };
   conversionFinished?: { connect(cb: (summaryJson: string) => void): void };
   conversionFailed?: { connect(cb: (message: string) => void): void };
+  /** Surbrillance zone file pendant un drag bureau (DnD natif Qt, PLO-53). */
+  dropOverlayVisible?: { connect(cb: (visible: boolean) => void): void };
+  /** File mise à jour après dépôt (payload ``PickFilesResult``). */
+  pathsAdded?: { connect(cb: (resultJson: string) => void): void };
 }

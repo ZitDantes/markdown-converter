@@ -353,12 +353,34 @@ button {
 }
 
 .queue-region {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 0 14px 14px;
   overflow: hidden;
+}
+
+.queue-drop-overlay {
+  position: absolute;
+  inset: 0 14px 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  border: 2px dashed var(--mc-accent, #0a7aff);
+  border-radius: var(--mc-radius-card);
+  background: rgba(10, 122, 255, 0.1);
+}
+
+.queue-drop-overlay__hint {
+  color: var(--mc-accent, #0a7aff);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 16px;
 }
 
 .queue-region__header {

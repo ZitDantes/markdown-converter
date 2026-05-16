@@ -26,7 +26,7 @@ export function ConversionQueue({
     return (
       <div className="queue-card">
         <p className="queue-empty">
-          Glissez-déposez des fichiers ou utilisez Fichiers / Dossier (parité DnD — PLO-53).
+          Glissez-déposez des fichiers ou dossiers ici, ou utilisez Fichiers / Dossier.
         </p>
       </div>
     );
