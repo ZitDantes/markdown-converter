@@ -49,6 +49,7 @@ export function App() {
   const [logOpen, setLogOpen] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("preview");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [dropOverlayVisible, setDropOverlayVisible] = useState(false);
 
   const appendLog = useCallback((level: string, message: string) => {
     setLogEntries((prev) => [
@@ -130,6 +131,12 @@ export function App() {
           void refreshQueue(b);
         });
         b.conversionFailed?.connect(() => {
+          void refreshQueue(b);
+        });
+        b.dropOverlayVisible?.connect((visible) => {
+          setDropOverlayVisible(Boolean(visible));
+        });
+        b.pathsAdded?.connect(() => {
           void refreshQueue(b);
         });
 
@@ -280,6 +287,7 @@ export function App() {
           onPickFolder={() => void onPickFolder()}
           onClear={() => void onClear()}
           onPickOutput={() => void onPickOutput()}
+          dropOverlayVisible={dropOverlayVisible}
           queueList={
             <ConversionQueue
               visibleItems={visibleItems}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { FileQueueItem, QueueState } from "@shared/bridge-contract";
+import { QueueDropOverlay } from "../queue/QueueDropOverlay";
 import {
   ConversionToolbar,
   type ConversionMode,
@@ -22,6 +23,7 @@ type MainColumnProps = {
   onClear: () => void;
   onPickOutput: () => void;
   queueList: ReactNode;
+  dropOverlayVisible: boolean;
 };
 
 export function MainColumn({
@@ -41,6 +43,7 @@ export function MainColumn({
   onClear,
   onPickOutput,
   queueList,
+  dropOverlayVisible,
 }: MainColumnProps) {
   return (
     <div className="main-column">
@@ -75,7 +78,10 @@ export function MainColumn({
         </button>
       </div>
 
-      <div className="queue-region">{queueList}</div>
+      <div className="queue-region">
+        <QueueDropOverlay visible={dropOverlayVisible && bridgeReady} />
+        {queueList}
+      </div>
     </div>
   );
 }
