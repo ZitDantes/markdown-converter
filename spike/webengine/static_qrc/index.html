@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spike WebEngine — qrc:</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body data-loader="qrc">
+    <main>
+      <h1>Markdown Converter — spike WebEngine</h1>
+      <p class="meta">Chargement <strong>qrc:</strong> (ressources embarquées Qt)</p>
+      <p id="status">Initialisation du pont…</p>
+      <p id="css-check" class="ok">CSS embarqué : en attente</p>
+      <button type="button" id="btn-ping">Ping Python</button>
+      <pre id="log"></pre>
+    </main>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/spike">
+    <file alias="index.html">static_qrc/index.html</file>
+    <file alias="app.js">static_qrc/app.js</file>
+    <file alias="style.css">static_qrc/style.css</file>
+  </qresource>
+</RCC>
