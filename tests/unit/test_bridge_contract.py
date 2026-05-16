@@ -9,7 +9,6 @@ from pathlib import Path
 from bridge_contract import (
     SCHEMA_VERSION,
     ConversionFinishedEvent,
-    FileQueueItem,
     QueueState,
     StartConversionCommand,
     file_queue_item_from_record,
@@ -28,6 +27,9 @@ def test_file_queue_item_uses_french_status_label() -> None:
     item = file_queue_item_from_record(rec)
     assert item.status == "success_review"
     assert item.statusLabel == "OK · relire"
+    assert item.fileName == "doc.pdf"
+    assert item.formatMonogram == "PDF"
+    assert item.sizeBytes >= 0
     assert "Pandoc" not in item.statusLabel
     assert "MarkItDown" not in item.statusLabel
 
@@ -35,15 +37,17 @@ def test_file_queue_item_uses_french_status_label() -> None:
 def test_queue_state_roundtrip_json() -> None:
     state = QueueState(
         items=[
-            FileQueueItem(
-                sourcePath="/a.docx",
-                status="queued",
-                statusLabel="En attente",
-                progressPercent=0.0,
+            file_queue_item_from_record(
+                FileConversionRecord(
+                    source_path=Path("/tmp/a.docx"),
+                    status=ConversionStatus.QUEUED,
+                    progress_percent=0.0,
+                )
             )
         ],
         outputDir="/out",
         canStartConversion=True,
+        totalSizeLabel="1,2 Ko",
     )
     raw = json.dumps(state.to_dict(), ensure_ascii=False)
     data = json.loads(raw)

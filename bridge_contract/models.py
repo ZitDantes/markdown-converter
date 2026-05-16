@@ -11,7 +11,14 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, TypeVar
 
 from converter import ConversionSummary, FileConversionRecord
-from ui_conversion_display import conversion_status_label_fr
+from ui_conversion_display import (
+    conversion_status_label_fr,
+    file_byte_size,
+    format_accent_hex,
+    format_byte_size,
+    format_monogram_for_path,
+)
+from utils import normalize_extension
 
 SCHEMA_VERSION = "0"
 BACKEND_OBJECT_NAME = "backend"
@@ -40,6 +47,13 @@ class FileQueueItem:
     status: str
     statusLabel: str
     progressPercent: float
+    fileName: str
+    parentDir: str
+    extension: str
+    sizeLabel: str
+    sizeBytes: int
+    formatColor: str
+    formatMonogram: str
     outputPath: str | None = None
     message: str | None = None
 
@@ -52,6 +66,7 @@ class QueueState:
     items: list[FileQueueItem] = field(default_factory=list)
     outputDir: str | None = None
     canStartConversion: bool = False
+    totalSizeLabel: str = "0 o"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -59,6 +74,7 @@ class QueueState:
             "items": [i.to_dict() for i in self.items],
             "outputDir": self.outputDir,
             "canStartConversion": self.canStartConversion,
+            "totalSizeLabel": self.totalSizeLabel,
         }
 
 
@@ -179,11 +195,21 @@ class ClearQueueResult:
 
 def file_queue_item_from_record(record: FileConversionRecord) -> FileQueueItem:
     """Construit un DTO file pour le front (libellé PLO-33 via ``conversion_status_label_fr``)."""
+    path = record.source_path
+    size_bytes = file_byte_size(path)
+    ext = normalize_extension(path)
     return FileQueueItem(
-        sourcePath=str(record.source_path),
+        sourcePath=str(path),
         status=record.status.value,
         statusLabel=conversion_status_label_fr(record.status),
         progressPercent=record.progress_percent,
+        fileName=path.name,
+        parentDir=str(path.parent),
+        extension=ext,
+        sizeLabel=format_byte_size(size_bytes),
+        sizeBytes=size_bytes,
+        formatColor=format_accent_hex(ext),
+        formatMonogram=format_monogram_for_path(path),
         outputPath=str(record.output_path) if record.output_path else None,
         message=record.message,
     )

@@ -20,8 +20,6 @@ export function MainColumn({
   onPickOutput,
   queueList,
 }: MainColumnProps) {
-  const itemCount = queue?.items.length ?? 0;
-
   return (
     <div className="main-column">
       <div className="toolbar" role="toolbar" aria-label="Actions principales">
@@ -45,7 +43,9 @@ export function MainColumn({
       </div>
 
       <div className="output-bar">
-        <span className="output-bar__icon" aria-hidden>📁</span>
+        <span className="output-bar__icon" aria-hidden>
+          📁
+        </span>
         <div className="output-bar__text">
           <span className="output-bar__label">Sortie</span>
           <span className="output-bar__path" title={queue?.outputDir ?? undefined}>
@@ -57,15 +57,7 @@ export function MainColumn({
         </button>
       </div>
 
-      <div className="queue-region">
-        <header className="queue-region__header">
-          <span className="queue-region__title">File de conversion</span>
-          <span className="queue-region__meta">
-            {itemCount} fichier{itemCount !== 1 ? "s" : ""}
-          </span>
-        </header>
-        <div className="queue-card">{queueList}</div>
-      </div>
+      <div className="queue-region">{queueList}</div>
     </div>
   );
 }

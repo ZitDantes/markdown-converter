@@ -18,22 +18,11 @@ from converter import FileConversionRecord
 from ui_conversion_display import (
     conversion_status_label_fr,
     file_byte_size,
+    format_accent_hex,
     format_byte_size,
+    format_monogram_for_path,
 )
 from utils import normalize_extension
-
-# Tokens « Couleurs par format » — design_handoff_ui_refonte/README.md
-_FORMAT_ACCENT_HEX: dict[str, str] = {
-    ".docx": "#2b6cb0",
-    ".pdf": "#c0392b",
-    ".pptx": "#d35400",
-    ".xlsx": "#1e8449",
-    ".html": "#6b46c1",
-    ".htm": "#6b46c1",
-    ".txt": "#4a5568",
-}
-
-_DEFAULT_FORMAT_HEX = "#4a5568"
 
 _COL_FORMAT = 0
 _COL_NAME = 1
@@ -44,23 +33,12 @@ _COL_PROGRESS = 4
 _HEADERS = ("Format", "Fichier", "Taille", "Statut", "Progression")
 
 
-def format_accent_hex(ext: str) -> str:
-    """Retourne le code couleur hexadécimal pour une extension (ex. ``.docx``).
-
-    Public car réutilisé par la toolbar (chips de filtre, PLO-36) afin de
-    garder un mapping unique avec la colonne « Format » du modèle.
-    """
-    normalized = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
-    return _FORMAT_ACCENT_HEX.get(normalized, _DEFAULT_FORMAT_HEX)
-
-
 def _format_accent_hex_for_path(path: Path) -> str:
     return format_accent_hex(normalize_extension(path))
 
 
 def _format_monogram(path: Path) -> str:
-    ext = normalize_extension(path).lstrip(".")
-    return (ext[:4] or "?").upper()
+    return format_monogram_for_path(path)
 
 
 def _progress_display(progress_percent: float) -> str:

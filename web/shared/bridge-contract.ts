@@ -25,6 +25,13 @@ export interface FileQueueItem {
   /** Libellé français fourni par Python (PLO-33) */
   statusLabel: string;
   progressPercent: number;
+  fileName: string;
+  parentDir: string;
+  extension: string;
+  sizeLabel: string;
+  sizeBytes: number;
+  formatColor: string;
+  formatMonogram: string;
   outputPath?: string | null;
   message?: string | null;
 }
@@ -34,6 +41,7 @@ export interface QueueState {
   items: FileQueueItem[];
   outputDir: string | null;
   canStartConversion: boolean;
+  totalSizeLabel: string;
 }
 
 export interface ProgressEvent {
@@ -123,6 +131,7 @@ export interface WebBackendBridge {
   setOutputDir(path: string): QtInvokeResult<string>;
   getQueueState(): QtInvokeResult<string>;
   clearQueue(): QtInvokeResult<string>;
+  removeQueueItem(sourcePath: string): QtInvokeResult<string>;
   startConversion(commandJson: string): QtInvokeResult<string>;
   cancelConversion(): QtInvokeResult<string>;
 
