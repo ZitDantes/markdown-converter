@@ -248,6 +248,19 @@ MARKDOWN_CONVERTER_UI=qt python3 main.py
 
 La **file** de conversion (tri, filtres, recherche, **glisser-déposer** de fichiers et dossiers depuis le gestionnaire de fichiers avec surbrillance au survol), l'exécution du lot dans un **thread** dédié, la **toolbar**, l'**inspecteur** (aperçu Markdown, sortie, détails), le **journal** repliable et le **pied de page** (progression, ETA, rapport) sont implémentés. **Thème clair / sombre** : boutons **« Sombre »** / **« Clair »** dans la barre de titre ; préférence enregistrée dans un fichier ``settings.json`` (Linux : ``~/.config/markdown-converter/`` ; macOS : ``~/Library/Application Support/Markdown Converter/`` ; Windows : ``%APPDATA%\Markdown Converter\``). **Session Qt** ([PLO-29](https://linear.app/dantes/issue/PLO-29)) : la liste des **chemins sources** (clés JSON ``source_paths``, jusqu'à 100 entrées) et le **dossier de sortie** (``output_dir``) sont relus au prochain lancement ; les fichiers absents ou formats non pris en charge ne sont pas remis en file ; un dossier de sortie enregistré mais devenu invalide est ignoré sans message d'erreur. **Modes Standard / Strict** ([PLO-40](https://linear.app/dantes/issue/PLO-40)) : le mode **Strict** désactive le secours dans ``convert_files(..., use_conversion_fallback=False)`` ; l'interface Tk n'expose pas encore ce réglage. **Forçage exclusif de la voie de secours** : hors surface produit ; une variable d'environnement ou des préférences avancées pourront le proposer plus tard — ce n'est pas encore implémenté (aucune variable active à ce jour). Variable optionnelle ``MARKDOWN_CONVERTER_SETTINGS_DIR`` pour forcer le dossier de configuration (tests, portable). La suite (exposition des moteurs, etc.) est suivie dans le projet Linear [Refonte interface (PySide6)](https://linear.app/dantes/project/refonte-interface-pyside6-a49711c9504d). Si PySide6 n'est pas installé alors que `MARKDOWN_CONVERTER_UI=qt`, l'application affiche un message et retombe automatiquement sur Tkinter.
 
+#### Prototype d'UI web (WebEngine)
+
+Socle **Vite + React** embarqué dans Qt WebEngine ([PLO-46](https://linear.app/dantes/issue/PLO-46)) ; contrat pont : [`docs/adr/0001-contrat-pont-webchannel-js-python.md`](docs/adr/0001-contrat-pont-webchannel-js-python.md).
+
+```bash
+source .venv/bin/activate
+pip install -r requirements-qt.txt
+./scripts/build_web.sh          # ou : cd web && npm ci && npm run build
+MARKDOWN_CONVERTER_UI=web python3 main.py
+```
+
+**Node.js** est requis pour **construire** le front (`web/`), pas pour lancer l'app une fois `web/dist/` généré. Détails : [`web/README.md`](web/README.md).
+
 #### Ajouter un moteur de conversion
 
 Pour ajouter un nouveau moteur (OCR, conversion cloud, format exotique…), il suffit de :

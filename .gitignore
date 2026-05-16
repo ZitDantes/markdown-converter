@@ -37,6 +37,11 @@ dist/
 *.dmg
 *.pkg
 
+# Front web (Node)
+web/node_modules/
+web/dist/
+web/tsconfig.tsbuildinfo
+
 # IDE / éditeurs
 .idea/
 .vscode/
