@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import { FooterBar } from "./components/layout/FooterBar";
-import { InspectorPanel } from "./components/layout/InspectorPanel";
+import { InspectorPanel, type InspectorTab } from "./components/inspector/InspectorPanel";
 import { LogDrawer } from "./components/layout/LogDrawer";
 import { MainColumn } from "./components/layout/MainColumn";
 import { ConversionQueue } from "./components/queue/ConversionQueue";
@@ -19,8 +19,6 @@ import {
 import { parseJson, qtInvoke, type AckResult } from "@shared/bridge-contract";
 
 type BridgeStatus = "loading" | "ready" | "error";
-type InspectorTab = "preview" | "output" | "details";
-
 function countDone(items: QueueState["items"]): number {
   return items.filter((i) =>
     ["success", "success_review", "success_fallback"].includes(i.status),
@@ -88,9 +86,11 @@ export function App() {
           const ok = ev.summary.records.filter((r) => r.statusLabel.startsWith("OK")).length;
           pushLog(`[INFO] conversion terminée : ${ok}/${n} fichier(s)`);
           setBatchPercent(1);
+          void refreshQueue(b);
         });
         b.conversionFailed?.connect((message) => {
           pushLog(`[ERROR] ${message}`);
+          void refreshQueue(b);
         });
 
         setBackend(b);
@@ -116,6 +116,10 @@ export function App() {
     [items, activeExtensions, searchQuery],
   );
   const doneCount = useMemo(() => countDone(items), [items]);
+  const selectedItem = useMemo(
+    () => items.find((i) => i.sourcePath === selectedPath) ?? null,
+    [items, selectedPath],
+  );
   const isConverting = items.some((i) => i.status === "processing");
   const queueActionsDisabled = !bridgeReady || isConverting;
   const strictMode = conversionMode === "strict";
@@ -227,9 +231,19 @@ export function App() {
       }
       inspector={
         <InspectorPanel
+          item={selectedItem}
           tab={inspectorTab}
           onTabChange={setInspectorTab}
-          hasSelection={selectedPath !== null}
+          isDark={isDark}
+          outputDir={queue?.outputDir ?? null}
+          backend={backend}
+          bridgeReady={bridgeReady}
+          actionsDisabled={queueActionsDisabled}
+          onPickOutput={() => void onPickOutput()}
+          onAfterRename={async () => {
+            if (backend) await refreshQueue(backend);
+          }}
+          onLog={pushLog}
         />
       }
       footer={

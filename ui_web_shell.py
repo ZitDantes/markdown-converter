@@ -18,6 +18,11 @@ from PySide6.QtWidgets import QFileDialog, QMainWindow, QWidget
 from bridge_contract import (
     BACKEND_OBJECT_NAME,
     AckResult,
+    BulkRenameApplyCommand,
+    BulkRenameApplyResult,
+    BulkRenameOperation,
+    BulkRenamePlanCommand,
+    BulkRenamePlanResult,
     ClearQueueResult,
     ConversionFinishedEvent,
     PickFilesResult,
@@ -27,6 +32,11 @@ from bridge_contract import (
     StartConversionCommand,
     file_queue_item_from_record,
     summary_dto_from_summary,
+)
+from bridge_contract.inspector_helpers import (
+    build_inspector_preview,
+    record_for_source_path,
+    resolve_output_path,
 )
 from bridge_contract.models import progress_event_from_worker
 from converter import ConversionStatus, ConversionSummary, FileConversionRecord
@@ -208,6 +218,175 @@ class WebBackend(QObject):
             ensure_ascii=False,
         )
 
+    @Slot(str, result=str)
+    def getInspectorPreview(self, source_path: str) -> str:
+        from bridge_contract.models import InspectorPreviewResult
+
+        rec = record_for_source_path(self._queue.records(), source_path)
+        if rec is None:
+            dto = InspectorPreviewResult(ok=False, message="Fichier introuvable dans la file.")
+        else:
+            dto = build_inspector_preview(rec)
+        return json.dumps(dto.to_dict(), ensure_ascii=False)
+
+    @Slot(str, result=str)
+    def getInspectorOutputPath(self, source_path: str) -> str:
+        from bridge_contract.models import InspectorOutputPathResult
+
+        rec = record_for_source_path(self._queue.records(), source_path)
+        if rec is None:
+            dto = InspectorOutputPathResult(ok=False, message="Fichier introuvable dans la file.")
+        else:
+            out = resolve_output_path(rec, self._output_dir)
+            if out is None:
+                dto = InspectorOutputPathResult(
+                    ok=False,
+                    message="Aucun fichier Markdown n'est encore associé à cette entrée.",
+                )
+            else:
+                rec.output_path = out
+                dto = InspectorOutputPathResult(ok=True, outputPath=str(out))
+        return json.dumps(dto.to_dict(), ensure_ascii=False)
+
+    @Slot(str, result=str)
+    def copyText(self, text: str) -> str:
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.clipboard().setText(text or "")
+        return json.dumps(AckResult(ok=True).to_dict(), ensure_ascii=False)
+
+    @Slot(str, result=str)
+    def openOutputParentFolder(self, source_path: str) -> str:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        rec = record_for_source_path(self._queue.records(), source_path)
+        if rec is None or rec.output_path is None:
+            return json.dumps(
+                AckResult(ok=False, message="Aucun fichier de sortie associé.").to_dict(),
+                ensure_ascii=False,
+            )
+        parent = rec.output_path.parent
+        try:
+            folder = str(parent.resolve())
+        except OSError:
+            folder = str(parent)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
+        return json.dumps(AckResult(ok=True).to_dict(), ensure_ascii=False)
+
+    @Slot(str, result=str)
+    def planBulkRename(self, command_json: str) -> str:
+        from ui_qt_inspector_rename import plan_bulk_rename
+
+        cmd = BulkRenamePlanCommand.from_json(command_json)
+        ops, err = plan_bulk_rename(
+            self._queue.records(),
+            cmd.prefix,
+            cmd.suffix,
+            cmd.caseMode,
+        )
+        if err:
+            return json.dumps(
+                BulkRenamePlanResult(ok=False, errorMessage=err).to_dict(),
+                ensure_ascii=False,
+            )
+        if not ops:
+            return json.dumps(
+                BulkRenamePlanResult(
+                    ok=True,
+                    previewLines=[],
+                    operationCount=0,
+                    operations=[],
+                ).to_dict(),
+                ensure_ascii=False,
+            )
+        preview_lines = [f"{op.old_path.name} → {op.new_path.name}" for op in ops]
+        operations = [
+            BulkRenameOperation(
+                sourcePath=str(op.record.source_path),
+                oldOutputPath=str(op.old_path),
+                newOutputPath=str(op.new_path),
+            )
+            for op in ops
+        ]
+        return json.dumps(
+            BulkRenamePlanResult(
+                ok=True,
+                previewLines=preview_lines,
+                operationCount=len(operations),
+                operations=operations,
+            ).to_dict(),
+            ensure_ascii=False,
+        )
+
+    @Slot(str, result=str)
+    def applyBulkRename(self, command_json: str) -> str:
+        from pathlib import Path
+
+        from ui_qt_inspector_rename import RenameOp, execute_rename_plan
+
+        if self._worker_thread is not None:
+            return json.dumps(
+                BulkRenameApplyResult(
+                    ok=False,
+                    message="Conversion en cours — action impossible.",
+                ).to_dict(),
+                ensure_ascii=False,
+            )
+
+        cmd = BulkRenameApplyCommand.from_json(command_json)
+        if not cmd.operations:
+            return json.dumps(
+                BulkRenameApplyResult(ok=True, renamedCount=0).to_dict(),
+                ensure_ascii=False,
+            )
+
+        rename_ops: list[RenameOp] = []
+        records_by_source = {str(r.source_path): r for r in self._queue.records()}
+        for op in cmd.operations:
+            rec = records_by_source.get(op.sourcePath)
+            if rec is None or rec.output_path is None:
+                return json.dumps(
+                    BulkRenameApplyResult(
+                        ok=False,
+                        message="La file a changé : renommage annulé.",
+                    ).to_dict(),
+                    ensure_ascii=False,
+                )
+            old = Path(op.oldOutputPath)
+            new = Path(op.newOutputPath)
+            try:
+                if rec.output_path.resolve() != old.resolve():
+                    return json.dumps(
+                        BulkRenameApplyResult(
+                            ok=False,
+                            message="La file a changé : renommage annulé.",
+                        ).to_dict(),
+                        ensure_ascii=False,
+                    )
+            except OSError:
+                if rec.output_path != old:
+                    return json.dumps(
+                        BulkRenameApplyResult(
+                            ok=False,
+                            message="La file a changé : renommage annulé.",
+                        ).to_dict(),
+                        ensure_ascii=False,
+                    )
+            rename_ops.append(RenameOp(record=rec, old_path=old, new_path=new))
+
+        ok, err = execute_rename_plan(rename_ops)
+        if not ok:
+            return json.dumps(
+                BulkRenameApplyResult(ok=False, message=err or "Échec du renommage.").to_dict(),
+                ensure_ascii=False,
+            )
+        self._emit_queue_updated()
+        return json.dumps(
+            BulkRenameApplyResult(ok=True, renamedCount=len(rename_ops)).to_dict(),
+            ensure_ascii=False,
+        )
+
     def _add_paths(self, paths: list[Path]) -> list[Path]:
         """Ajoute des chemins supportés ; réutilise ``add_paths_to_model`` via adaptateur."""
         model = ConversionFileTableModel(self._queue.records())
@@ -220,7 +399,12 @@ class WebBackend(QObject):
         from ui_conversion_display import file_byte_size, format_byte_size
 
         records = self._queue.records()
-        items = [file_queue_item_from_record(r) for r in records]
+        items = []
+        for rec in records:
+            out = resolve_output_path(rec, self._output_dir)
+            if out is not None:
+                rec.output_path = out
+            items.append(file_queue_item_from_record(rec, resolved_output_path=out))
         total_bytes = sum(file_byte_size(r.source_path) for r in records)
         can_start = (
             self._output_dir is not None
@@ -281,13 +465,32 @@ class WebBackend(QObject):
         self._worker_sink = None
         self._emit_queue_updated()
 
+    def _merge_summary_records(self, summary: ConversionSummary) -> None:
+        """Fusionne le résumé worker dans la file (ordre conservé, chemins résolus)."""
+        from bridge_contract.inspector_helpers import _path_key
+
+        incoming = {_path_key(r.source_path): r for r in summary.records}
+        merged: list[FileConversionRecord] = []
+        for old in self._queue.records():
+            key = _path_key(old.source_path)
+            rec = incoming.pop(key, None)
+            merged.append(rec if rec is not None else old)
+        merged.extend(incoming.values())
+        self._queue.set_records(merged)
+
     def _apply_progress(self, index: int, total: int, label: str, percent: float) -> None:
         records = self._queue.records()
         if total <= 0 or not records:
             return
-        row = index if index < len(records) else len(records) - 1
-        rec = records[row]
-        rec.progress_percent = max(0.0, min(1.0, percent * total - row))
+        rec = None
+        for candidate in records:
+            if candidate.source_path.name == label:
+                rec = candidate
+                break
+        if rec is None:
+            row = index if index < len(records) else len(records) - 1
+            rec = records[row]
+        rec.progress_percent = max(0.0, min(1.0, percent))
         if rec.status == ConversionStatus.QUEUED:
             rec.status = ConversionStatus.PROCESSING
         event = progress_event_from_worker(index, total, label, percent)
@@ -298,7 +501,7 @@ class WebBackend(QObject):
         if not isinstance(summary, ConversionSummary):
             self.logEmitted.emit("ERROR", "Résumé de conversion invalide.")
             return
-        self._queue.set_records(list(summary.records))
+        self._merge_summary_records(summary)
         dto = summary_dto_from_summary(summary)
         event = ConversionFinishedEvent(summary=dto)
         from converter import SUCCESS_STATUSES, ConversionStatus

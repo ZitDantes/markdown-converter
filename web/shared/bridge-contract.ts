@@ -34,6 +34,61 @@ export interface FileQueueItem {
   formatMonogram: string;
   outputPath?: string | null;
   message?: string | null;
+  engineUsed?: string | null;
+  usedPandocFallback?: boolean;
+  errorType?: string | null;
+}
+
+export interface InspectorOutputPathResult {
+  schemaVersion: SchemaVersion;
+  ok: boolean;
+  outputPath?: string | null;
+  message?: string | null;
+}
+
+export interface InspectorPreviewResult {
+  schemaVersion: SchemaVersion;
+  ok: boolean;
+  message?: string | null;
+  frontMatter?: Record<string, string> | null;
+  body?: string | null;
+  warning?: string | null;
+}
+
+export type BulkRenameCaseMode = "unchanged" | "lower" | "upper" | "title";
+
+export interface BulkRenamePlanCommand {
+  schemaVersion?: SchemaVersion;
+  prefix?: string;
+  suffix?: string;
+  caseMode?: BulkRenameCaseMode;
+}
+
+export interface BulkRenameOperation {
+  sourcePath: string;
+  oldOutputPath: string;
+  newOutputPath: string;
+}
+
+export interface BulkRenamePlanResult {
+  schemaVersion: SchemaVersion;
+  ok: boolean;
+  previewLines: string[];
+  operationCount: number;
+  operations: BulkRenameOperation[];
+  errorMessage?: string | null;
+}
+
+export interface BulkRenameApplyCommand {
+  schemaVersion?: SchemaVersion;
+  operations: BulkRenameOperation[];
+}
+
+export interface BulkRenameApplyResult {
+  schemaVersion: SchemaVersion;
+  ok: boolean;
+  renamedCount: number;
+  message?: string | null;
 }
 
 export interface QueueState {
@@ -134,6 +189,12 @@ export interface WebBackendBridge {
   removeQueueItem(sourcePath: string): QtInvokeResult<string>;
   startConversion(commandJson: string): QtInvokeResult<string>;
   cancelConversion(): QtInvokeResult<string>;
+  getInspectorPreview(sourcePath: string): QtInvokeResult<string>;
+  getInspectorOutputPath(sourcePath: string): QtInvokeResult<string>;
+  copyText(text: string): QtInvokeResult<string>;
+  openOutputParentFolder(sourcePath: string): QtInvokeResult<string>;
+  planBulkRename(commandJson: string): QtInvokeResult<string>;
+  applyBulkRename(commandJson: string): QtInvokeResult<string>;
 
   logEmitted?: { connect(cb: (level: string, message: string) => void): void };
   progressUpdated?: { connect(cb: (progressJson: string) => void): void };

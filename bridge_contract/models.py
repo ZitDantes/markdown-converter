@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any, TypeVar
 
 from converter import ConversionSummary, FileConversionRecord
@@ -56,9 +57,133 @@ class FileQueueItem:
     formatMonogram: str
     outputPath: str | None = None
     message: str | None = None
+    engineUsed: str | None = None
+    usedPandocFallback: bool = False
+    errorType: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class InspectorPreviewResult:
+    ok: bool
+    message: str | None = None
+    frontMatter: dict[str, str] | None = None
+    body: str | None = None
+    warning: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schemaVersion": SCHEMA_VERSION,
+            "ok": self.ok,
+            "message": self.message,
+            "frontMatter": self.frontMatter,
+            "body": self.body,
+            "warning": self.warning,
+        }
+
+
+@dataclass
+class BulkRenamePlanCommand:
+    prefix: str = ""
+    suffix: str = ""
+    caseMode: str = "unchanged"
+
+    @classmethod
+    def from_json(cls, text: str) -> BulkRenamePlanCommand:
+        data = loads_json(text)
+        return cls(
+            prefix=str(data.get("prefix", "")),
+            suffix=str(data.get("suffix", "")),
+            caseMode=str(data.get("caseMode", "unchanged")),
+        )
+
+
+@dataclass
+class BulkRenameOperation:
+    sourcePath: str
+    oldOutputPath: str
+    newOutputPath: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "sourcePath": self.sourcePath,
+            "oldOutputPath": self.oldOutputPath,
+            "newOutputPath": self.newOutputPath,
+        }
+
+
+@dataclass
+class BulkRenamePlanResult:
+    ok: bool
+    previewLines: list[str] = field(default_factory=list)
+    operationCount: int = 0
+    operations: list[BulkRenameOperation] = field(default_factory=list)
+    errorMessage: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schemaVersion": SCHEMA_VERSION,
+            "ok": self.ok,
+            "previewLines": self.previewLines,
+            "operationCount": self.operationCount,
+            "operations": [op.to_dict() for op in self.operations],
+            "errorMessage": self.errorMessage,
+        }
+
+
+@dataclass
+class BulkRenameApplyCommand:
+    operations: list[BulkRenameOperation] = field(default_factory=list)
+
+    @classmethod
+    def from_json(cls, text: str) -> BulkRenameApplyCommand:
+        data = loads_json(text)
+        raw_ops = data.get("operations", [])
+        ops: list[BulkRenameOperation] = []
+        if isinstance(raw_ops, list):
+            for item in raw_ops:
+                if not isinstance(item, dict):
+                    continue
+                ops.append(
+                    BulkRenameOperation(
+                        sourcePath=str(item.get("sourcePath", "")),
+                        oldOutputPath=str(item.get("oldOutputPath", "")),
+                        newOutputPath=str(item.get("newOutputPath", "")),
+                    )
+                )
+        return cls(operations=ops)
+
+
+@dataclass
+class InspectorOutputPathResult:
+    ok: bool
+    outputPath: str | None = None
+    message: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schemaVersion": SCHEMA_VERSION,
+            "ok": self.ok,
+            "outputPath": self.outputPath,
+            "message": self.message,
+        }
+
+
+@dataclass
+class BulkRenameApplyResult:
+    ok: bool
+    renamedCount: int = 0
+    message: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schemaVersion": SCHEMA_VERSION,
+            "ok": self.ok,
+            "renamedCount": self.renamedCount,
+            "message": self.message,
+        }
 
 
 @dataclass
@@ -193,11 +318,16 @@ class ClearQueueResult:
         }
 
 
-def file_queue_item_from_record(record: FileConversionRecord) -> FileQueueItem:
+def file_queue_item_from_record(
+    record: FileConversionRecord,
+    *,
+    resolved_output_path: Path | None = None,
+) -> FileQueueItem:
     """Construit un DTO file pour le front (libellé PLO-33 via ``conversion_status_label_fr``)."""
     path = record.source_path
     size_bytes = file_byte_size(path)
     ext = normalize_extension(path)
+    out = resolved_output_path if resolved_output_path is not None else record.output_path
     return FileQueueItem(
         sourcePath=str(path),
         status=record.status.value,
@@ -210,8 +340,11 @@ def file_queue_item_from_record(record: FileConversionRecord) -> FileQueueItem:
         sizeBytes=size_bytes,
         formatColor=format_accent_hex(ext),
         formatMonogram=format_monogram_for_path(path),
-        outputPath=str(record.output_path) if record.output_path else None,
+        outputPath=str(out) if out else None,
         message=record.message,
+        engineUsed=record.engine_used,
+        usedPandocFallback=record.used_pandoc_fallback,
+        errorType=record.error_type,
     )
 
 
