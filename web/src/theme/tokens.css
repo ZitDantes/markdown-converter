@@ -1,0 +1,72 @@
+/* Tokens design — handoff design_handoff_ui_refonte/README.md (PLO-48) */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --mc-bg-window: #f6f7f9;
+  --mc-bg-titlebar: linear-gradient(180deg, rgba(238, 239, 242, 0.94), rgba(225, 227, 231, 0.94));
+  --mc-bg-inspector: rgba(255, 255, 255, 0.35);
+  --mc-bg-surface: rgba(255, 255, 255, 0.55);
+  --mc-bg-surface-muted: rgba(255, 255, 255, 0.65);
+  --mc-bg-footer: rgba(255, 255, 255, 0.45);
+  --mc-bg-input: rgba(255, 255, 255, 0.7);
+  --mc-bg-button: rgba(255, 255, 255, 0.85);
+  --mc-bg-button-ghost: transparent;
+  --mc-bg-button-primary: #0a7aff;
+  --mc-bg-progress-track: rgba(0, 0, 0, 0.06);
+  --mc-bg-row-hover: rgba(0, 0, 0, 0.025);
+  --mc-bg-row-selected: rgba(0, 122, 255, 0.08);
+  --mc-border-subtle: rgba(0, 0, 0, 0.06);
+  --mc-border-titlebar: rgba(0, 0, 0, 0.16);
+  --mc-border-split: rgba(0, 0, 0, 0.07);
+  --mc-text-primary: #1a1d24;
+  --mc-text-secondary: #6b7280;
+  --mc-text-titlebar: #1a1d24;
+  --mc-text-on-primary: #ffffff;
+  --mc-accent: #0a7aff;
+  --mc-accent-soft: #5ab1ff;
+  --mc-success: #1f8a4c;
+  --mc-warn: #b06a00;
+  --mc-error: #b00020;
+  --mc-pandoc: #0b66c2;
+  --mc-shadow-window: 0 0 0 0.5px rgba(0, 0, 0, 0.18), 0 14px 34px rgba(0, 0, 0, 0.14);
+  --mc-inset-surface: 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+  --mc-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --mc-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --mc-radius-window: 12px;
+  --mc-radius-card: 10px;
+  --mc-radius-button: 6px;
+  --mc-inspector-width: 380px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --mc-bg-window: #1c1f26;
+  --mc-bg-titlebar: linear-gradient(180deg, rgba(48, 52, 62, 0.92), rgba(34, 38, 46, 0.92));
+  --mc-bg-inspector: rgba(255, 255, 255, 0.015);
+  --mc-bg-surface: rgba(255, 255, 255, 0.025);
+  --mc-bg-surface-muted: rgba(255, 255, 255, 0.04);
+  --mc-bg-footer: rgba(28, 31, 38, 0.7);
+  --mc-bg-input: rgba(0, 0, 0, 0.3);
+  --mc-bg-button: rgba(255, 255, 255, 0.08);
+  --mc-bg-button-ghost: transparent;
+  --mc-bg-button-primary: #0a7aff;
+  --mc-bg-progress-track: rgba(255, 255, 255, 0.06);
+  --mc-bg-row-hover: rgba(255, 255, 255, 0.04);
+  --mc-bg-row-selected: rgba(20, 110, 220, 0.2);
+  --mc-border-subtle: rgba(255, 255, 255, 0.06);
+  --mc-border-titlebar: rgba(0, 0, 0, 0.5);
+  --mc-border-split: rgba(255, 255, 255, 0.07);
+  --mc-text-primary: #f0f3f8;
+  --mc-text-secondary: #8a92a3;
+  --mc-text-titlebar: #e7e9ed;
+  --mc-text-on-primary: #ffffff;
+  --mc-accent: #0a7aff;
+  --mc-accent-soft: #7eb3ff;
+  --mc-success: #7adc9d;
+  --mc-warn: #f5c97b;
+  --mc-error: #ff8a80;
+  --mc-pandoc: #7eb3ff;
+  --mc-shadow-window: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 14px 34px rgba(0, 0, 0, 0.35);
+  --mc-inset-surface: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
