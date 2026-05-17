@@ -6,6 +6,7 @@ import {
   parseJson,
   qtInvoke,
 } from "@shared/bridge-contract";
+import { waitForQWebChannelScript } from "./lib/webChannelSignals";
 
 function parseBridgeJson<T>(raw: string | T): T {
   return parseJson<T>(raw);
@@ -22,6 +23,7 @@ export async function connectBackend(): Promise<WebBackendBridge> {
   if (typeof qt === "undefined") {
     throw new Error("QWebChannel indisponible (hors WebEngine ?)");
   }
+  await waitForQWebChannelScript();
 
   return new Promise((resolve, reject) => {
     new QWebChannel(qt.webChannelTransport, (channel) => {

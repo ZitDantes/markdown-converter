@@ -645,12 +645,13 @@ def _configure_web_settings(view: QWebEngineView) -> None:
     view.page().profile().setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
 
 
-def _register_web_channel(view: QWebEngineView, backend: WebBackend) -> None:
+def _register_web_channel(view: QWebEngineView, backend: WebBackend) -> object:
     from PySide6.QtWebChannel import QWebChannel
 
     channel = QWebChannel(view.page())
     channel.registerObject(BACKEND_OBJECT_NAME, backend)
     view.page().setWebChannel(channel)
+    return channel
 
 
 class WebShellWindow(QMainWindow):
@@ -666,7 +667,8 @@ class WebShellWindow(QMainWindow):
         self._backend = WebBackend(self)
         self._view = WebEngineDropView(self._backend, self)
         _configure_web_settings(self._view)
-        _register_web_channel(self._view, self._backend)
+        # Référence forte : évite la collecte du canal par PySide6 pendant la session.
+        self._web_channel = _register_web_channel(self._view, self._backend)
         self.setCentralWidget(self._view)
         self._view.load(resolve_web_index_url())
 

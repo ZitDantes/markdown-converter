@@ -185,6 +185,11 @@ export function parseJson<T>(raw: string | T): T {
   return raw;
 }
 
+export type QtWebChannelSignal<T extends (...args: never[]) => void> = {
+  connect(cb: T): void;
+  disconnect?(cb: T): void;
+};
+
 /** Objet exposé par QWebChannel (méthodes = commandes, propriétés = signaux) */
 export interface WebBackendBridge {
   ping(message: string): QtInvokeResult<string>;
@@ -207,13 +212,13 @@ export interface WebBackendBridge {
   planBulkRename(commandJson: string): QtInvokeResult<string>;
   applyBulkRename(commandJson: string): QtInvokeResult<string>;
 
-  logEmitted?: { connect(cb: (level: string, message: string) => void): void };
-  progressUpdated?: { connect(cb: (progressJson: string) => void): void };
-  queueUpdated?: { connect(cb: (queueJson: string) => void): void };
-  conversionFinished?: { connect(cb: (summaryJson: string) => void): void };
-  conversionFailed?: { connect(cb: (message: string) => void): void };
+  logEmitted?: QtWebChannelSignal<(level: string, message: string) => void>;
+  progressUpdated?: QtWebChannelSignal<(progressJson: string) => void>;
+  queueUpdated?: QtWebChannelSignal<(queueJson: string) => void>;
+  conversionFinished?: QtWebChannelSignal<(summaryJson: string) => void>;
+  conversionFailed?: QtWebChannelSignal<(message: string) => void>;
   /** Surbrillance zone file pendant un drag bureau (DnD natif Qt, PLO-53). */
-  dropOverlayVisible?: { connect(cb: (visible: boolean) => void): void };
+  dropOverlayVisible?: QtWebChannelSignal<(visible: boolean) => void>;
   /** File mise à jour après dépôt (payload ``PickFilesResult``). */
-  pathsAdded?: { connect(cb: (resultJson: string) => void): void };
+  pathsAdded?: QtWebChannelSignal<(resultJson: string) => void>;
 }

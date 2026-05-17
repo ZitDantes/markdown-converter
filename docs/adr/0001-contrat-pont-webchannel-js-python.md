@@ -119,6 +119,8 @@ Les enums de statut reprennent les valeurs string de `ConversionStatus` dans `co
 
 ## Validation
 
+- Le build Vite doit charger `qwebchannel.js` **avant** le bundle applicatif (plugin `qwebchannel-first` dans `web/vite.config.ts`, PLO-67).
+
 - [x] ADR versionnée (`docs/adr/0001-…`)
 - [x] Schéma v0 : `bridge_contract/models.py` + `web/shared/bridge-contract.ts`
 - [x] Règle threading documentée (§4)

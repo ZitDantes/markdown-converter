@@ -84,8 +84,79 @@ export function parseConversionFinishedPayload(
 }
 
 /**
- * Interroge ``getQueueState`` jusqu'à la fin du lot (contournement si les signaux
- * QWebChannel n'alimentent pas React de façon fiable).
+ * Attend la fin du lot en interrogeant ``getQueueState`` (fiable sous WebEngine).
+ * Les signaux ``conversionFinished`` / ``conversionFailed`` peuvent accélérer la fin
+ * si le navigateur les reçoit ; le polling reste la source de vérité pour l’UI.
+ */
+export async function waitForConversionIdle(
+  backend: WebBackendBridge,
+  onUpdate: (state: QueueState) => void,
+  options?: { intervalMs?: number; timeoutMs?: number },
+): Promise<QueueState> {
+  const intervalMs = options?.intervalMs ?? 200;
+  const maxWaitMs = options?.timeoutMs ?? 300_000;
+  const hasSignals =
+    Boolean(backend.conversionFinished?.connect) &&
+    Boolean(backend.conversionFailed?.connect);
+
+  if (!hasSignals) {
+    return pollQueueUntilIdle(backend, onUpdate, { intervalMs, maxWaitMs });
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const finish = (state: QueueState) => {
+      if (settled) return;
+      settled = true;
+      if (pollTimer !== null) {
+        window.clearInterval(pollTimer);
+      }
+      window.clearTimeout(safetyTimer);
+      finishedSignal.disconnect?.(onFinished);
+      failedSignal.disconnect?.(onFailed);
+      resolve(state);
+    };
+
+    const pollOnce = () => {
+      void qtInvoke(() => backend.getQueueState())
+        .then((raw) => {
+          if (settled) return;
+          const state = parseJsonValue<QueueState>(raw);
+          onUpdate(state);
+          const anyTerminal = state.items.some((i) => isTerminalStatus(i.status));
+          const stillRunning = state.items.some(
+            (i) => i.status === "queued" || i.status === "processing",
+          );
+          if (anyTerminal && !stillRunning && state.items.length > 0) {
+            finish(state);
+          }
+        })
+        .catch(reject);
+    };
+
+    pollOnce();
+    pollTimer = window.setInterval(pollOnce, intervalMs);
+
+    const safetyTimer = window.setTimeout(() => {
+      if (settled) return;
+      void pollQueueUntilIdle(backend, onUpdate, { intervalMs, maxWaitMs: 5_000 })
+        .then(finish)
+        .catch(reject);
+    }, maxWaitMs);
+
+    const finishedSignal = backend.conversionFinished!;
+    const failedSignal = backend.conversionFailed!;
+    const onFinished = () => pollOnce();
+    const onFailed = () => pollOnce();
+    finishedSignal.connect(onFinished);
+    failedSignal.connect(onFailed);
+  });
+}
+
+/**
+ * Interroge ``getQueueState`` jusqu'à la fin du lot (repli de secours).
  */
 export async function pollQueueUntilIdle(
   backend: WebBackendBridge,
