@@ -4,6 +4,16 @@ Le format est inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-05-17
+
+### Corrigé
+
+- **Packaging macOS** : l’archive `MarkdownConverter-mac-*.zip` utilisait `zip -rq`, qui **dupliquait les hard links** de Qt WebEngine (~2,9 Go décompressés au lieu de ~550 Mo). Le script `build_mac_app.sh` emploie désormais **`ditto -c -k`** (~200 Mo de ZIP, ~550 Mo une fois le `.app` extrait).
+
+### À retenir pour les utilisateurs
+
+- Préférer **`MarkdownConverter-mac-v0.3.1.zip`** (ou une release ultérieure). L’asset **v0.3.0** sur GitHub est **gonflé** : même application, mais archive incorrecte.
+
 ## [0.3.0] — 2026-05-17
 
 Version orientée **interface web locale** (React + Vite) embarquée dans **PySide6 + Qt WebEngine**, avec pont **QWebChannel** vers le moteur Python existant. Clôture de l’epic UI web ([PLO-43](https://linear.app/dantes/issue/PLO-43)).
@@ -24,7 +34,7 @@ Version orientée **interface web locale** (React + Vite) embarquée dans **PySi
 
 ### À retenir pour les utilisateurs
 
-- Distribution macOS : `MarkdownConverter-mac-v0.3.0.zip` sur GitHub Releases (**~1,1 Go** : MarkItDown + PySide6 + **Qt WebEngine** + front buildé).
+- Distribution macOS : voir **v0.3.1** pour la taille correcte (~550 Mo `.app`, ~200 Mo ZIP). La v0.3.0 avait un ZIP défectueux (~2,9 Go décompressés).
 - Depuis les sources : `cd web && npm ci && npm run build` puis `MARKDOWN_CONVERTER_UI=web python3 main.py`.
 - `MARKDOWN_CONVERTER_UI=qt` est **obsolète** (traité comme `web`).
 - L’interface **Tkinter** reste disponible (`MARKDOWN_CONVERTER_UI=tk` ou repli automatique).

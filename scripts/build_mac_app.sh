@@ -46,18 +46,30 @@ echo "Taille du .app (décompressé) : ${APP_SIZE}"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
-cp -R "dist/${APP_NAME}" "$STAGE/"
+# -c : clones APFS (évite de matérialiser les hard links PyInstaller avant archivage).
+cp -Rc "dist/${APP_NAME}" "$STAGE/"
 cp docs/LISEZMOI_COLLEGUES.txt "$STAGE/LISEZMOI.txt"
 
 VERSION="${1:-$(date +%Y%m%d-%H%M)}"
 ZIP_NAME="MarkdownConverter-mac-${VERSION}.zip"
-( cd "$STAGE" && zip -rq "$ROOT/$ZIP_NAME" . )
+rm -f "$ROOT/$ZIP_NAME"
+
+# zip(1) duplique les hard links Qt WebEngine (~2,9 Go décompressés) : utiliser ditto.
+ditto -c -k --sequesterRsrc "$STAGE" "$ROOT/$ZIP_NAME"
+
+VERIFY="$(mktemp -d)"
+ditto -x -k "$ROOT/$ZIP_NAME" "$VERIFY"
+UNZIPPED_APP_SIZE="$(du -sh "$VERIFY/${APP_NAME}" | awk '{print $1}')"
+rm -rf "$VERIFY"
+if [[ "${UNZIPPED_APP_SIZE}" != "${APP_SIZE}" ]]; then
+  echo "Vérification : .app dans l’archive ≈ ${UNZIPPED_APP_SIZE} (source ${APP_SIZE})." >&2
+fi
 
 ZIP_SIZE="$(du -sh "$ROOT/$ZIP_NAME" | awk '{print $1}')"
 echo "OK — archive prête pour distribution :"
 echo "  $ROOT/$ZIP_NAME"
-echo "  Taille ZIP : ${ZIP_SIZE} (GitHub Release : max 2 Go par asset ; ne pas committer ce ZIP dans Git, max 100 Mo/fichier)"
-# Avertissement grossier si la taille affichée par du contient « G » (ex. 1,1G) — rester sous 2 Go.
+echo "  Taille ZIP : ${ZIP_SIZE} ; .app après décompression : ${UNZIPPED_APP_SIZE}"
+echo "  (GitHub Release : max 2 Go par asset ; ne pas committer ce ZIP dans Git, max 100 Mo/fichier)"
 if [[ "${ZIP_SIZE}" == *G* ]]; then
   echo "Attention : archive volumineuse — vérifier qu’elle reste sous 2 Go avant upload GitHub Release." >&2
 fi

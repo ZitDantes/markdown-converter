@@ -345,11 +345,12 @@ python3 -m PyInstaller --noconfirm MarkdownConverter.spec
 | Artefact | Taille typique |
 |----------|----------------|
 | `Markdown Converter.app` seul | **~550 Mo** (`du -sh`) |
-| Archive ZIP | **~1,1 Go** (compression faible sur binaires Qt) |
+| Archive ZIP (`ditto -c -k`, depuis v0.3.1) | **~200 Mo** ; **~550 Mo** une fois le `.app` extrait |
+| ⚠️ ZIP v0.3.0 (`zip -rq`) | **~1 Go** téléchargé, **~2,9 Go** décompressé (hard links Qt dupliqués — ne pas utiliser) |
 
 Le Finder peut afficher une valeur plus élevée (métadonnées, copies locales). **Ne pas cumuler** ZIP + `.app` décompressée + dossier `dist/` du build : cela double ou triple l’espace disque perçu.
 
-**GitHub** : ne pas committer le ZIP dans le dépôt (limite **100 Mo par fichier** dans Git). Les **GitHub Releases** acceptent jusqu’à **2 Go par asset** — une archive ~1,1 Go ou la v0.2 (~316 Mo) convient. Voir [About releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases).
+**GitHub** : ne pas committer le ZIP dans le dépôt (limite **100 Mo par fichier** dans Git). Les **GitHub Releases** acceptent jusqu’à **2 Go par asset**. Utiliser `./scripts/build_mac_app.sh` (archivage **ditto**, pas `zip -rq`). Voir [About releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases).
 
 **Alternative** en une ligne (équivalent approximatif sans fichier `.spec` dédié) :
 
