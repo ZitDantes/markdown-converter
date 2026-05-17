@@ -4,6 +4,32 @@ Le format est inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-17
+
+Version orientée **interface web locale** (React + Vite) embarquée dans **PySide6 + Qt WebEngine**, avec pont **QWebChannel** vers le moteur Python existant. Clôture de l’epic UI web ([PLO-43](https://linear.app/dantes/issue/PLO-43)).
+
+### Ajouté
+
+- **UI web** (`MARKDOWN_CONVERTER_UI=web`) : shell PySide6 + `QWebEngineView`, front `web/` (layout, file, toolbar, inspecteur, journal, glisser-déposer, modes Standard / Strict).
+- **Contrat pont** : ADR 0001 (`docs/adr/0001-contrat-pont-webchannel-js-python.md`), schéma v0 (`bridge_contract/`, `web/shared/bridge-contract.ts`).
+- **CI** : build du front (`npm ci` / `npm run build`) en échec si le bundle casse.
+- **Fallback** : si WebEngine est indisponible, repli **Tkinter** (variable `MARKDOWN_CONVERTER_WEB_FALLBACK`, défaut `tk`).
+- **Spike** documenté : `spike/webengine/` (chargement `file:` / `qrc:`).
+
+### Modifié
+
+- **Bundle macOS** : UI **web** par défaut dans le `.app` (plus les widgets Qt legacy).
+- **Archivage** : modules `ui_qt_*` widgets déplacés vers `archive/ui_qt_widgets/` ; modules partagés (`ui_qt_file_model`, worker, inspecteur) conservés pour le pont web.
+- **Signaux QWebChannel** : ordre de chargement `qwebchannel.js`, connexion typée ; polling `getQueueState` pendant la conversion pour la file et la barre de progression (limitation WebEngine).
+
+### À retenir pour les utilisateurs
+
+- Distribution macOS : `MarkdownConverter-mac-v0.3.0.zip` sur GitHub Releases (**~1,1 Go** : MarkItDown + PySide6 + **Qt WebEngine** + front buildé).
+- Depuis les sources : `cd web && npm ci && npm run build` puis `MARKDOWN_CONVERTER_UI=web python3 main.py`.
+- `MARKDOWN_CONVERTER_UI=qt` est **obsolète** (traité comme `web`).
+- L’interface **Tkinter** reste disponible (`MARKDOWN_CONVERTER_UI=tk` ou repli automatique).
+- **100 % local** — aucun appel réseau au runtime.
+
 ## [0.2.0] — 2026-05-15
 
 Version orientée **interface graphique PySide6** (UI Qt complète) et **documentation utilisateur** dans le dépôt (`docs/`).
