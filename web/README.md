@@ -32,3 +32,15 @@ MARKDOWN_CONVERTER_UI=web python3 main.py
 | `dist/` | Build statique (généré, non versionné) |
 
 Contrat : [ADR 0001](../docs/adr/0001-contrat-pont-webchannel-js-python.md).
+
+## Si WebEngine est indisponible (PLO-54)
+
+Au lancement avec `MARKDOWN_CONVERTER_UI=web`, l’app vérifie PySide6, **Qt WebEngineWidgets** et la présence de `web/dist/index.html`.
+
+| Variable | Comportement |
+|----------|----------------|
+| *(défaut)* | Repli vers l’**interface Qt widgets** (`ui_qt`, `MARKDOWN_CONVERTER_UI=qt`) |
+| `MARKDOWN_CONVERTER_WEB_FALLBACK=tk` | Repli vers **Tkinter** |
+| `MARKDOWN_CONVERTER_WEB_FALLBACK=none` | Message d’erreur en français, puis arrêt (code 1) |
+
+Dépendances Linux : voir [spike/webengine/README.md](../spike/webengine/README.md).

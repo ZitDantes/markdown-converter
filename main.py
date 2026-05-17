@@ -16,6 +16,8 @@ UI web (PLO-46) ::
 
     cd web && npm ci && npm run build
     MARKDOWN_CONVERTER_UI=web python3 main.py
+
+Si WebEngine est indisponible, repli automatique vers l'UI Qt widgets (``MARKDOWN_CONVERTER_WEB_FALLBACK``).
 """
 
 from __future__ import annotations
@@ -25,10 +27,14 @@ import sys
 
 MIN_PYTHON = (3, 10)
 UI_ENV_VAR = "MARKDOWN_CONVERTER_UI"
+WEB_FALLBACK_ENV = "MARKDOWN_CONVERTER_WEB_FALLBACK"
 UI_TK = "tk"
 UI_QT = "qt"
 UI_WEB_SPIKE = "web-spike"
 UI_WEB = "web"
+WEB_FALLBACK_QT = "qt"
+WEB_FALLBACK_TK = "tk"
+WEB_FALLBACK_NONE = "none"
 
 
 def _fail_python_version() -> None:
@@ -117,11 +123,51 @@ def _run_web_spike_ui() -> None:
     run_web_spike()
 
 
-def _run_web_ui() -> None:
-    """Lance le shell UI web (PLO-46). Quitte le processus."""
+def _resolve_web_fallback() -> str:
+    """Politique de repli si ``MARKDOWN_CONVERTER_UI=web`` est indisponible (PLO-54)."""
+    raw = os.environ.get(WEB_FALLBACK_ENV, WEB_FALLBACK_QT).strip().lower()
+    if raw in (WEB_FALLBACK_NONE, "fail", "error", "off"):
+        return WEB_FALLBACK_NONE
+    if raw == UI_TK:
+        return WEB_FALLBACK_TK
+    return WEB_FALLBACK_QT
+
+
+def _try_run_web_ui() -> bool:
+    """Tente l'UI web ; retourne ``False`` si indisponible (repli géré par ``main``)."""
+    from ui_web_bootstrap import format_web_unavailable_message, probe_web_ui_availability
     from ui_web_shell import run_app as run_web_app
 
+    avail = probe_web_ui_availability()
+    if not avail.ok:
+        print(format_web_unavailable_message(avail), file=sys.stderr)
+        return False
     run_web_app()
+    return True
+
+
+def _run_web_ui_with_fallback(logger: object) -> bool:
+    """Lance l'UI web ou un repli. Retourne ``True`` si une UI a démarré."""
+    if _try_run_web_ui():
+        return True
+
+    fallback = _resolve_web_fallback()
+    if fallback == WEB_FALLBACK_NONE:
+        raise SystemExit(1)
+
+    logger.warning("UI web indisponible — repli demandé : %s", fallback)
+    if fallback == WEB_FALLBACK_QT:
+        print(
+            "Bascule vers l'interface Qt widgets (MARKDOWN_CONVERTER_UI=qt).",
+            file=sys.stderr,
+        )
+        return _run_qt_ui()
+
+    print(
+        "Bascule vers l'interface Tkinter (MARKDOWN_CONVERTER_UI=tk).",
+        file=sys.stderr,
+    )
+    return False
 
 
 def main() -> None:
@@ -145,12 +191,11 @@ def main() -> None:
         from logging_setup import get_logger, setup_logging
 
         log_path = setup_logging()
-        get_logger("main").info(
-            "Démarrage UI web (PLO-46, logs : %s).",
-            log_path,
-        )
-        _run_web_ui()
-        return
+        logger = get_logger("main")
+        logger.info("Démarrage UI web (logs : %s).", log_path)
+        if _run_web_ui_with_fallback(logger):
+            return
+        # Repli Tk si Qt indisponible ou ``MARKDOWN_CONVERTER_WEB_FALLBACK=tk``.
 
     if ui_choice == UI_QT:
         from logging_setup import get_logger, setup_logging

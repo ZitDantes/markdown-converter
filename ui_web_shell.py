@@ -673,30 +673,11 @@ class WebShellWindow(QMainWindow):
 
 def run_app() -> None:
     """Lance l'UI web (PySide6 + WebEngine + build ``web/dist``)."""
-    try:
-        from PySide6.QtWidgets import QApplication
-    except ImportError as exc:
-        print(
-            "L'UI web requiert PySide6.\nInstallez : pip install -r requirements-qt.txt",
-            file=sys.stderr,
-        )
-        raise SystemExit(1) from exc
+    from ui_web_bootstrap import ensure_web_ui_ready
 
-    try:
-        import PySide6.QtWebEngineWidgets  # noqa: F401
-    except ImportError as exc:
-        print(
-            "Qt WebEngineWidgets est indisponible.\n"
-            "Voir spike/webengine/README.md (dépendances Linux).",
-            file=sys.stderr,
-        )
-        raise SystemExit(1) from exc
+    ensure_web_ui_ready()
 
-    try:
-        resolve_web_index_url()
-    except FileNotFoundError as exc:
-        print(str(exc), file=sys.stderr)
-        raise SystemExit(1) from exc
+    from PySide6.QtWidgets import QApplication
 
     app = QApplication.instance() or QApplication(sys.argv)
     window = WebShellWindow()
