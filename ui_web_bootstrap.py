@@ -3,9 +3,9 @@ Disponibilité de l'UI web (PLO-54) — détection avant lancement et messages e
 
 Politique de repli (``main.py``) lorsque ``MARKDOWN_CONVERTER_UI=web`` :
 
-- Par défaut : interface **Qt widgets** (``ui_qt``, parité fonctionnelle).
-- ``MARKDOWN_CONVERTER_WEB_FALLBACK=tk`` : interface Tkinter.
+- Par défaut : interface **Tkinter** (``ui.py``).
 - ``MARKDOWN_CONVERTER_WEB_FALLBACK=none`` : message d'erreur puis sortie (code 1).
+- L'ancienne UI Qt widgets est archivée (``archive/ui_qt_widgets/``, PLO-56).
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ def format_web_unavailable_message(avail: WebUiAvailability) -> str:
                 "  pip install -r requirements-qt.txt",
                 "",
                 "Ou lancez une autre interface :",
-                "  MARKDOWN_CONVERTER_UI=qt python3 main.py",
+                "  MARKDOWN_CONVERTER_UI=tk python3 main.py",
                 "  MARKDOWN_CONVERTER_UI=tk python3 main.py",
             ]
         )
@@ -93,8 +93,7 @@ def format_web_unavailable_message(avail: WebUiAvailability) -> str:
                 "    libcups2 libdrm2 libgbm1 libxcomposite1 libxdamage1 libxfixes3 \\",
                 "    libxrandr2 libpango-1.0-0 libcairo2 libasound2",
                 "",
-                "Bascule automatique vers l'interface Qt widgets (par défaut) ou :",
-                "  MARKDOWN_CONVERTER_WEB_FALLBACK=tk",
+                "Bascule automatique vers Tkinter (par défaut) ou :",
                 "  MARKDOWN_CONVERTER_WEB_FALLBACK=none   # arrêt sans repli",
             ]
         )

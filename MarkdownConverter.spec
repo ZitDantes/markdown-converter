@@ -46,6 +46,9 @@ hiddenimports += [
     "ui_web_bootstrap",
     "ui_web_loaders",
     "ui_web_drop",
+    "ui_web_engine_env",
+    "conversion_queue",
+    "conversion_mime_paths",
     "bridge_contract",
     "bridge_contract.models",
     "bridge_contract.inspector_helpers",
@@ -53,17 +56,10 @@ hiddenimports += [
     "PySide6.QtWebEngineWidgets",
     "PySide6.QtWebChannel",
     "PySide6.QtPrintSupport",
-    "ui_qt",
     "ui_qt_conversion_worker",
     "ui_qt_file_model",
-    "ui_qt_file_proxy",
-    "ui_qt_file_drop_table",
-    "ui_qt_inspector",
     "ui_qt_inspector_data",
     "ui_qt_inspector_rename",
-    "ui_qt_journal",
-    "ui_qt_settings",
-    "ui_qt_theme",
 ]
 
 a = Analysis(

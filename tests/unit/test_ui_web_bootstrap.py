@@ -58,7 +58,6 @@ def test_resolve_web_fallback_env() -> None:
     from main import (
         WEB_FALLBACK_ENV,
         WEB_FALLBACK_NONE,
-        WEB_FALLBACK_QT,
         WEB_FALLBACK_TK,
         _resolve_web_fallback,
     )
@@ -68,6 +67,6 @@ def test_resolve_web_fallback_env() -> None:
     os.environ[WEB_FALLBACK_ENV] = "none"
     assert _resolve_web_fallback() == WEB_FALLBACK_NONE
     os.environ[WEB_FALLBACK_ENV] = "qt"
-    assert _resolve_web_fallback() == WEB_FALLBACK_QT
+    assert _resolve_web_fallback() == WEB_FALLBACK_TK
     del os.environ[WEB_FALLBACK_ENV]
-    assert _resolve_web_fallback() == WEB_FALLBACK_QT
+    assert _resolve_web_fallback() == WEB_FALLBACK_TK

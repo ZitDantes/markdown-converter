@@ -210,12 +210,13 @@ Pour **contribuer au code** (correctifs, évolutions, documentation technique), 
 |--------------------|------|
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Guide de contribution (humains) : setup, lint, tests, PR, dépendances. |
 | `main.py` | Lancement de l’application. |
-| `ui.py` | Interface Tkinter (français, **par défaut**). |
-| `ui_qt.py` | Interface PySide6 (opt-in via `MARKDOWN_CONVERTER_UI=qt`, voir [Prototype d'UI PySide6](#prototype-dui-pyside6)). |
-| `ui_qt_file_drop_table.py` | Vue de file avec glisser-déposer natif (fichiers et dossiers, même règles que l'ajout par boutons). |
-| `ui_qt_settings.py` | Chemins et lecture/écriture du fichier JSON de préférences Qt (thème, file, dossier de sortie). |
-| `ui_qt_theme.py` | Application du thème clair / sombre (palette Fusion). |
-| `requirements-qt.txt` | Dépendances optionnelles pour l'UI PySide6 (`PySide6`). |
+| `ui.py` | Interface Tkinter (secours / dev sans build front). |
+| `ui_web_shell.py` | Interface **web** (PySide6 + WebEngine + `web/dist/`, voir ci-dessous). |
+| `web/` | Front Vite + React (build → `web/dist/`). |
+| `conversion_queue.py`, `conversion_mime_paths.py` | Helpers file partagés (UI web). |
+| `ui_qt_file_model.py`, `ui_qt_conversion_worker.py` | Modèle de file et worker (partagés avec l'UI web). |
+| `archive/ui_qt_widgets/` | Ancienne UI Qt widgets archivée (PLO-56). |
+| `requirements-qt.txt` | Dépendances pour WebEngine + UI web (`PySide6`). |
 | `converter.py` | Orchestration du lot (boucle, statut par fichier, rapport). |
 | `engines/` | Moteurs de conversion isolés derrière une interface commune. |
 | `engines/base.py` | Classe abstraite `ConverterEngine` et exceptions custom. |
@@ -236,19 +237,7 @@ L'API de `converter.py` (callbacks `on_log(level, message)` / `on_progress(index
 
 Pour les UIs qui veulent afficher un **aperçu** du Markdown produit sans relire le disque, `convert_files(..., keep_output_in_memory=True)` remplit `FileConversionRecord.output_md_text` avec le contenu exact écrit (front-matter + corps). Par défaut le champ reste `None` pour éviter de charger inutilement la RAM sur de gros lots. L'argument optionnel `use_conversion_fallback` (défaut `True`) permet de désactiver le secours ; voir [`converter.py`](converter.py) et la section prototype Qt ci-dessous.
 
-#### Prototype d'UI PySide6
-
-L'interface Tkinter (`ui.py`) reste l'UI par défaut. L'UI PySide6 vit dans `ui_qt.py` et les modules `ui_qt_*.py` ; l'épic [PLO-26](https://linear.app/dantes/issue/PLO-26) est **terminé** (sous-tickets [PLO-34](https://linear.app/dantes/issue/PLO-34) à [PLO-39](https://linear.app/dantes/issue/PLO-39)). Pour l'essayer :
-
-```bash
-source .venv/bin/activate
-pip install -r requirements-qt.txt   # ajoute PySide6 (dépendance facultative)
-MARKDOWN_CONVERTER_UI=qt python3 main.py
-```
-
-La **file** de conversion (tri, filtres, recherche, **glisser-déposer** de fichiers et dossiers depuis le gestionnaire de fichiers avec surbrillance au survol), l'exécution du lot dans un **thread** dédié, la **toolbar**, l'**inspecteur** (aperçu Markdown, sortie, détails), le **journal** repliable et le **pied de page** (progression, ETA, rapport) sont implémentés. **Thème clair / sombre** : boutons **« Sombre »** / **« Clair »** dans la barre de titre ; préférence enregistrée dans un fichier ``settings.json`` (Linux : ``~/.config/markdown-converter/`` ; macOS : ``~/Library/Application Support/Markdown Converter/`` ; Windows : ``%APPDATA%\Markdown Converter\``). **Session Qt** ([PLO-29](https://linear.app/dantes/issue/PLO-29)) : la liste des **chemins sources** (clés JSON ``source_paths``, jusqu'à 100 entrées) et le **dossier de sortie** (``output_dir``) sont relus au prochain lancement ; les fichiers absents ou formats non pris en charge ne sont pas remis en file ; un dossier de sortie enregistré mais devenu invalide est ignoré sans message d'erreur. **Modes Standard / Strict** ([PLO-40](https://linear.app/dantes/issue/PLO-40)) : le mode **Strict** désactive le secours dans ``convert_files(..., use_conversion_fallback=False)`` ; l'interface Tk n'expose pas encore ce réglage. **Forçage exclusif de la voie de secours** : hors surface produit ; une variable d'environnement ou des préférences avancées pourront le proposer plus tard — ce n'est pas encore implémenté (aucune variable active à ce jour). Variable optionnelle ``MARKDOWN_CONVERTER_SETTINGS_DIR`` pour forcer le dossier de configuration (tests, portable). La suite (exposition des moteurs, etc.) est suivie dans le projet Linear [Refonte interface (PySide6)](https://linear.app/dantes/project/refonte-interface-pyside6-a49711c9504d). Si PySide6 n'est pas installé alors que `MARKDOWN_CONVERTER_UI=qt`, l'application affiche un message et retombe automatiquement sur Tkinter.
-
-#### Prototype d'UI web (WebEngine)
+#### UI web (WebEngine) — interface principale
 
 Socle **Vite + React** embarqué dans Qt WebEngine ([PLO-46](https://linear.app/dantes/issue/PLO-46)) ; contrat pont : [`docs/adr/0001-contrat-pont-webchannel-js-python.md`](docs/adr/0001-contrat-pont-webchannel-js-python.md).
 
@@ -261,7 +250,7 @@ MARKDOWN_CONVERTER_UI=web python3 main.py
 
 **Node.js** est requis pour **construire** le front (`web/`), pas pour lancer l'app une fois `web/dist/` généré. Détails : [`web/README.md`](web/README.md).
 
-Si **Qt WebEngine** est absent, l'app affiche un message en français et bascule par défaut vers l'interface **Qt widgets** (`MARKDOWN_CONVERTER_WEB_FALLBACK`, voir `web/README.md`).
+Sans variable d'environnement, le lancement **en dev** reste sur Tkinter ; le **`.app`** packagé ouvre l'UI web par défaut. Si **Qt WebEngine** est absent, repli **Tkinter** (`MARKDOWN_CONVERTER_WEB_FALLBACK`, voir `web/README.md`). L'ancienne UI Qt widgets est dans `archive/ui_qt_widgets/` (PLO-56).
 
 #### Ajouter un moteur de conversion
 

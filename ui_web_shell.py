@@ -40,8 +40,8 @@ from bridge_contract.inspector_helpers import (
     resolve_output_path,
 )
 from bridge_contract.models import progress_event_from_worker
+from conversion_queue import add_paths_to_model
 from converter import ConversionStatus, ConversionSummary, FileConversionRecord
-from ui_qt import add_paths_to_model
 from ui_qt_file_model import ConversionFileTableModel
 from ui_web_loaders import resolve_web_index_url
 from utils import SUPPORTED_EXTENSIONS, collect_supported_files_under_directory, is_supported_path
@@ -433,7 +433,7 @@ class WebBackend(QObject):
         """Traite un dépôt glisser-déposer (fichiers et dossiers, extensions supportées)."""
         from PySide6.QtCore import QMimeData
 
-        from ui_qt_file_drop_table import supported_paths_from_mime
+        from conversion_mime_paths import supported_paths_from_mime
 
         if not isinstance(mime, QMimeData):
             return

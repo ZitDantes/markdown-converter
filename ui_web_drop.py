@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
-from ui_qt_file_drop_table import supported_paths_from_mime
+from conversion_mime_paths import supported_paths_from_mime
 
 if TYPE_CHECKING:
     from ui_web_shell import WebBackend
