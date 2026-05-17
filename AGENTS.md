@@ -84,7 +84,7 @@ Le repo GitHub a l'option **« Automatically delete head branches »** activée.
 - Conserver l'API actuelle de `converter.py` (callbacks `on_log` / `on_progress`) pour permettre un futur swap d'UI.
 - Build macOS : `./scripts/build_mac_app.sh` ou directement via `MarkdownConverter.spec` (PyInstaller).
 - **Ne jamais committer** : `.venv/`, `build/`, `dist/`, `__pycache__/`, archives `.zip`/`.dmg`, `.DS_Store`. Cf. `.gitignore`.
-- **Distribution binaire** : via GitHub Releases, pas dans le repo (la limite GitHub est 100 MB par fichier).
+- **Distribution binaire** : via GitHub Releases, pas dans le repo Git (fichiers versionnés : max **100 Mo** ; assets de release : max **2 Go** par fichier).
 
 ## 5. Style de commit et de PR
 

@@ -67,7 +67,7 @@ du -sh .venv/lib/python*/site-packages/PySide6/Qt/lib/QtWebEngine*.framework
 du -sh .venv/lib/python*/site-packages/PySide6/Qt/lib/QtWebEngineCore.framework
 ```
 
-Sur une machine de référence (macOS, PySide6 6.11), **QtWebEngineCore.framework** seul fait environ **588 Mo** dans le venv ; les modules satellites (`QtWebEngineWidgets`, etc.) ajoutent quelques Mo. Depuis **PLO-55**, le `.app` / bundle Linux **inclut** WebEngine et `web/dist` ; prévoir un ZIP souvent **> 100 Mo** (limite GitHub Release par fichier). Build : `./scripts/build_mac_app.sh` ou `./scripts/build_linux_app.sh`.
+Sur une machine de référence (macOS, PySide6 6.11), **QtWebEngineCore.framework** seul fait environ **588 Mo** dans le venv ; les modules satellites (`QtWebEngineWidgets`, etc.) ajoutent quelques Mo. Depuis **PLO-55**, le `.app` / bundle Linux **inclut** WebEngine et `web/dist` ; le ZIP de release est souvent **~1 Go** (sous la limite **2 Go/asset** des GitHub Releases ; ne pas committer le binaire dans Git, limite **100 Mo/fichier**). Build : `./scripts/build_mac_app.sh` ou `./scripts/build_linux_app.sh`.
 
 Comparaison v0.2 sans WebEngine : voir notes de release GitHub.
 

@@ -56,7 +56,8 @@ ZIP_NAME="MarkdownConverter-mac-${VERSION}.zip"
 ZIP_SIZE="$(du -sh "$ROOT/$ZIP_NAME" | awk '{print $1}')"
 echo "OK — archive prête pour distribution :"
 echo "  $ROOT/$ZIP_NAME"
-echo "  Taille ZIP : ${ZIP_SIZE} (limite GitHub Release : 100 Mo par fichier)"
-if [[ "${ZIP_SIZE}" == *G* ]] || { [[ "${ZIP_SIZE}" == *M* ]] && [[ "${ZIP_SIZE%%M*}" -gt 100 ]]; }; then
-  echo "Attention : l’archive dépasse peut‑être 100 Mo — vérifier avant une GitHub Release." >&2
+echo "  Taille ZIP : ${ZIP_SIZE} (GitHub Release : max 2 Go par asset ; ne pas committer ce ZIP dans Git, max 100 Mo/fichier)"
+# Avertissement grossier si la taille affichée par du contient « G » (ex. 1,1G) — rester sous 2 Go.
+if [[ "${ZIP_SIZE}" == *G* ]]; then
+  echo "Attention : archive volumineuse — vérifier qu’elle reste sous 2 Go avant upload GitHub Release." >&2
 fi

@@ -360,7 +360,7 @@ python3 -m PyInstaller --noconfirm MarkdownConverter.spec
 
 Le Finder peut afficher une valeur plus élevée (métadonnées, copies locales). **Ne pas cumuler** ZIP + `.app` décompressée + dossier `dist/` du build : cela double ou triple l’espace disque perçu.
 
-L’ajout de WebEngine dépasse la limite **GitHub Release (100 Mo/fichier)** : prévoir hébergement alternatif, découpage, ou release « widgets seule » sans WebEngine (voir historique v0.2).
+**GitHub** : ne pas committer le ZIP dans le dépôt (limite **100 Mo par fichier** dans Git). Les **GitHub Releases** acceptent jusqu’à **2 Go par asset** — une archive ~1,1 Go ou la v0.2 (~316 Mo) convient. Voir [About releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases).
 
 **Alternative** en une ligne (équivalent approximatif sans fichier `.spec` dédié) :
 
