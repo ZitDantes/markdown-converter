@@ -338,16 +338,29 @@ Les versions **Python 3.10, 3.11 et 3.12** sont testées sur **Ubuntu** (matrice
 
 ### Build PyInstaller (fichier `.spec` recommandé)
 
-Le fichier **[`MarkdownConverter.spec`](MarkdownConverter.spec)** est la référence de build (mode fenêtré, collecte complète de **markitdown**). Préférez-le aux commandes manuelles ci-dessous.
+Le fichier **[`MarkdownConverter.spec`](MarkdownConverter.spec)** est la référence de build (mode fenêtré, **markitdown**, **Qt WebEngine**, front **`web/dist`** embarqué). L’UI par défaut dans le bundle est **`MARKDOWN_CONVERTER_UI=web`** (repli Qt/Tk documenté dans [`web/README.md`](web/README.md)).
 
 ```bash
 cd markdown-converter   # racine du dépôt cloné (dossier contenant main.py)
 source .venv/bin/activate
-python3 -m pip install pyinstaller
+python3 -m pip install -r requirements.txt -r requirements-qt.txt pyinstaller
+./scripts/build_web.sh
 python3 -m PyInstaller --noconfirm MarkdownConverter.spec
 ```
 
-Le résultat se trouve dans **`dist/Markdown Converter.app`**.
+- **macOS** : **`dist/Markdown Converter.app`**
+- **Linux** : dossier **`dist/Markdown Converter/`** (pas de `.app` ; voir ci‑dessous)
+
+**Taille (ordre de grandeur, macOS arm64)** :
+
+| Artefact | Taille typique |
+|----------|----------------|
+| `Markdown Converter.app` seul | **~550 Mo** (`du -sh`) |
+| Archive ZIP | **~1,1 Go** (compression faible sur binaires Qt) |
+
+Le Finder peut afficher une valeur plus élevée (métadonnées, copies locales). **Ne pas cumuler** ZIP + `.app` décompressée + dossier `dist/` du build : cela double ou triple l’espace disque perçu.
+
+**GitHub** : ne pas committer le ZIP dans le dépôt (limite **100 Mo par fichier** dans Git). Les **GitHub Releases** acceptent jusqu’à **2 Go par asset** — une archive ~1,1 Go ou la v0.2 (~316 Mo) convient. Voir [About releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases).
 
 **Alternative** en une ligne (équivalent approximatif sans fichier `.spec` dédié) :
 
@@ -360,9 +373,22 @@ pyinstaller --windowed --name "Markdown Converter" --collect-all markitdown main
 Pour régénérer `dist/…` et créer une archive prête à envoyer (`.app` + `LISEZMOI.txt` dérivé de [`docs/LISEZMOI_COLLEGUES.txt`](docs/LISEZMOI_COLLEGUES.txt)) :
 
 ```bash
-./scripts/build_mac_app.sh              # archive horodatée (build interne)
+./scripts/build_mac_app.sh              # build web + PyInstaller ; archive horodatée
 ./scripts/build_mac_app.sh v0.1.0       # archive nommée pour une release GitHub
 ```
+
+Le script affiche la **taille du .app** et du **ZIP** à la fin du build.
+
+### Build Linux (`build_linux_app.sh`)
+
+Sur **Ubuntu 22.04+** (ou équivalent), après les paquets listés dans [`spike/webengine/README.md`](spike/webengine/README.md) :
+
+```bash
+./scripts/build_linux_app.sh
+./scripts/build_linux_app.sh v0.3.0     # produit MarkdownConverter-linux-v0.3.0.tar.gz
+```
+
+Lancement : extraire l’archive, puis exécuter `./Markdown\ Converter/Markdown\ Converter` depuis le dossier extrait.
 
 Sans argument, l’archive porte un nom du type **`MarkdownConverter-mac-AAAAMMJJ-HHMM.zip`**. Avec un argument de version (ex. `v0.1.0`), elle s’appelle **`MarkdownConverter-mac-v0.1.0.zip`**, prête à être attachée à une [GitHub Release](https://github.com/ZitDantes/markdown-converter/releases).
 
