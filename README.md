@@ -261,6 +261,8 @@ MARKDOWN_CONVERTER_UI=web python3 main.py
 
 **Node.js** est requis pour **construire** le front (`web/`), pas pour lancer l'app une fois `web/dist/` généré. Détails : [`web/README.md`](web/README.md).
 
+Si **Qt WebEngine** est absent, l'app affiche un message en français et bascule par défaut vers l'interface **Qt widgets** (`MARKDOWN_CONVERTER_WEB_FALLBACK`, voir `web/README.md`).
+
 #### Ajouter un moteur de conversion
 
 Pour ajouter un nouveau moteur (OCR, conversion cloud, format exotique…), il suffit de :
