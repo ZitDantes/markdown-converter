@@ -4,6 +4,12 @@ Le format est inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-05-17
+
+### Corrigé
+
+- **Crash au lancement du `.app` macOS** : PyInstaller rangeait `QtWebEngineProcess` et les ressources Chromium sous `Versions/Resources/` au lieu de `Versions/A/`. Réparation au build (`webengine_macos_repair.py`) + variables `QTWEBENGINEPROCESS_PATH` / `QTWEBENGINE_RESOURCES_PATH` au runtime.
+
 ## [0.3.1] — 2026-05-17
 
 ### Corrigé

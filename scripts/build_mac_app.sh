@@ -40,6 +40,9 @@ if [[ -d "dist/Markdown Converter" && ! -L "dist/Markdown Converter" ]]; then
   rm -rf "dist/Markdown Converter"
 fi
 
+echo "== Réparation Qt WebEngine (Helpers / ressources Chromium) =="
+python3 webengine_macos_repair.py "dist/${APP_NAME}"
+
 APP_SIZE="$(du -sh "dist/${APP_NAME}" | awk '{print $1}')"
 echo "Taille du .app (décompressé) : ${APP_SIZE}"
 
