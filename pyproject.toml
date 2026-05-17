@@ -8,6 +8,7 @@ line-length = 100
 # Fichiers/dossiers à ignorer (en complément du .gitignore).
 extend-exclude = [
     ".venv",
+    "archive",
     "build",
     "dist",
     "docs",

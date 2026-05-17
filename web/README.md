@@ -39,8 +39,9 @@ Au lancement avec `MARKDOWN_CONVERTER_UI=web`, l’app vérifie PySide6, **Qt We
 
 | Variable | Comportement |
 |----------|----------------|
-| *(défaut)* | Repli vers l’**interface Qt widgets** (`ui_qt`, `MARKDOWN_CONVERTER_UI=qt`) |
-| `MARKDOWN_CONVERTER_WEB_FALLBACK=tk` | Repli vers **Tkinter** |
+| *(défaut)* | Repli vers **Tkinter** (`ui.py`) |
 | `MARKDOWN_CONVERTER_WEB_FALLBACK=none` | Message d’erreur en français, puis arrêt (code 1) |
+
+`MARKDOWN_CONVERTER_WEB_FALLBACK=qt` est obsolète (PLO-56) et équivaut à Tkinter.
 
 Dépendances Linux : voir [spike/webengine/README.md](../spike/webengine/README.md).

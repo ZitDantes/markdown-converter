@@ -1,23 +1,20 @@
 """
 Point d'entrée : lance l'interface graphique de Markdown Converter.
 
-L'UI par défaut est Tkinter (``ui.py``). Pour essayer le prototype PySide6,
-définir ``MARKDOWN_CONVERTER_UI=qt`` avant le lancement, après avoir installé
-les dépendances optionnelles ::
+UI recommandée : **web** (PySide6 + Qt WebEngine + front ``web/dist``) ::
 
-    pip install -r requirements-qt.txt
-    MARKDOWN_CONVERTER_UI=qt python3 main.py
+    cd web && npm ci && npm run build
+    MARKDOWN_CONVERTER_UI=web python3 main.py
+
+En développement sans variable, l'UI par défaut est **Tkinter** (``ui.py``).
+Dans le bundle PyInstaller (``.app``), l'UI par défaut est **web**.
 
 Spike WebEngine (PLO-44) ::
 
     MARKDOWN_CONVERTER_UI=web-spike python3 main.py
 
-UI web (PLO-46) ::
-
-    cd web && npm ci && npm run build
-    MARKDOWN_CONVERTER_UI=web python3 main.py
-
-Si WebEngine est indisponible, repli automatique vers l'UI Qt widgets (``MARKDOWN_CONVERTER_WEB_FALLBACK``).
+Si WebEngine est indisponible, repli vers **Tkinter** (``MARKDOWN_CONVERTER_WEB_FALLBACK``).
+L'ancienne UI Qt widgets est archivée sous ``archive/ui_qt_widgets/`` (PLO-56).
 """
 
 from __future__ import annotations
@@ -29,10 +26,9 @@ MIN_PYTHON = (3, 10)
 UI_ENV_VAR = "MARKDOWN_CONVERTER_UI"
 WEB_FALLBACK_ENV = "MARKDOWN_CONVERTER_WEB_FALLBACK"
 UI_TK = "tk"
-UI_QT = "qt"
+UI_QT = "qt"  # obsolète (PLO-56) — traité comme web
 UI_WEB_SPIKE = "web-spike"
 UI_WEB = "web"
-WEB_FALLBACK_QT = "qt"
 WEB_FALLBACK_TK = "tk"
 WEB_FALLBACK_NONE = "none"
 
@@ -86,37 +82,26 @@ def _fail_tkinter(exc: BaseException | None = None) -> None:
     sys.exit(1)
 
 
+def _warn_deprecated_ui_qt() -> None:
+    print(
+        f"{UI_ENV_VAR}=qt est obsolète (interface widgets archivée, PLO-56).\n"
+        f"Utilisez {UI_ENV_VAR}=web ou {UI_ENV_VAR}=tk.\n",
+        file=sys.stderr,
+    )
+
+
 def _resolve_ui_choice() -> str:
-    """Lit ``MARKDOWN_CONVERTER_UI`` ; valeurs ignorées (typo, vide) → ``tk`` (dev) ou ``web`` (bundle)."""
+    """Lit ``MARKDOWN_CONVERTER_UI`` ; défaut ``tk`` (dev) ou ``web`` (bundle gelé)."""
     raw = os.environ.get(UI_ENV_VAR, "").strip().lower()
     if not raw and getattr(sys, "frozen", False):
-        # .app / onedir PyInstaller : défaut web (PLO-55), même sans LSEnvironment.
         return UI_WEB
     if raw == UI_WEB_SPIKE:
         return UI_WEB_SPIKE
-    if raw == UI_WEB:
+    if raw in (UI_WEB, UI_QT):
+        if raw == UI_QT:
+            _warn_deprecated_ui_qt()
         return UI_WEB
-    return UI_QT if raw == UI_QT else UI_TK
-
-
-def _run_qt_ui() -> bool:
-    """Tente de lancer l'UI PySide6 ; retourne ``True`` si elle a tourné.
-
-    Si PySide6 n'est pas installé, on prévient et on retourne ``False`` pour
-    que ``main()`` retombe sur l'UI Tkinter (au lieu de planter l'app).
-    """
-    try:
-        from ui_qt import run_app as run_qt_app
-    except ImportError as e:
-        print(
-            f"{UI_ENV_VAR}=qt demandé mais PySide6 est introuvable.\n"
-            "Installez-le avec : pip install -r requirements-qt.txt\n"
-            f"Bascule vers l'interface Tkinter par sécurité.\nDétail : {e}",
-            file=sys.stderr,
-        )
-        return False
-    run_qt_app()
-    return True
+    return UI_TK
 
 
 def _run_web_spike_ui() -> None:
@@ -127,13 +112,17 @@ def _run_web_spike_ui() -> None:
 
 
 def _resolve_web_fallback() -> str:
-    """Politique de repli si ``MARKDOWN_CONVERTER_UI=web`` est indisponible (PLO-54)."""
-    raw = os.environ.get(WEB_FALLBACK_ENV, WEB_FALLBACK_QT).strip().lower()
+    """Politique de repli si ``MARKDOWN_CONVERTER_UI=web`` est indisponible (PLO-54, PLO-56)."""
+    raw = os.environ.get(WEB_FALLBACK_ENV, WEB_FALLBACK_TK).strip().lower()
     if raw in (WEB_FALLBACK_NONE, "fail", "error", "off"):
         return WEB_FALLBACK_NONE
-    if raw == UI_TK:
+    if raw in (UI_QT, "qt"):
+        print(
+            f"{WEB_FALLBACK_ENV}=qt est obsolète — repli Tkinter (PLO-56).\n",
+            file=sys.stderr,
+        )
         return WEB_FALLBACK_TK
-    return WEB_FALLBACK_QT
+    return WEB_FALLBACK_TK
 
 
 def _try_run_web_ui() -> bool:
@@ -153,7 +142,7 @@ def _try_run_web_ui() -> bool:
 
 
 def _run_web_ui_with_fallback(logger: object) -> bool:
-    """Lance l'UI web ou un repli. Retourne ``True`` si une UI a démarré."""
+    """Lance l'UI web ou un repli Tk. Retourne ``True`` si une UI a démarré."""
     if _try_run_web_ui():
         return True
 
@@ -161,14 +150,7 @@ def _run_web_ui_with_fallback(logger: object) -> bool:
     if fallback == WEB_FALLBACK_NONE:
         raise SystemExit(1)
 
-    logger.warning("UI web indisponible — repli demandé : %s", fallback)
-    if fallback == WEB_FALLBACK_QT:
-        print(
-            "Bascule vers l'interface Qt widgets (MARKDOWN_CONVERTER_UI=qt).",
-            file=sys.stderr,
-        )
-        return _run_qt_ui()
-
+    logger.warning("UI web indisponible — repli Tkinter")
     print(
         "Bascule vers l'interface Tkinter (MARKDOWN_CONVERTER_UI=tk).",
         file=sys.stderr,
@@ -201,19 +183,6 @@ def main() -> None:
         logger.info("Démarrage UI web (logs : %s).", log_path)
         if _run_web_ui_with_fallback(logger):
             return
-        # Repli Tk si Qt indisponible ou ``MARKDOWN_CONVERTER_WEB_FALLBACK=tk``.
-
-    if ui_choice == UI_QT:
-        from logging_setup import get_logger, setup_logging
-
-        log_path = setup_logging()
-        get_logger("main").info(
-            "Démarrage de l'application (UI Qt, logs : %s).",
-            log_path,
-        )
-        if _run_qt_ui():
-            return
-        # Sinon : on tombe sur le chemin Tk ci-dessous.
 
     try:
         import tkinter  # noqa: F401
