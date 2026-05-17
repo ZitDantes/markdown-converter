@@ -6,8 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from conversion_queue import add_paths_to_model
-
 
 @pytest.fixture
 def qt_app() -> object:
@@ -22,6 +20,7 @@ def qt_app() -> object:
 
 
 def test_add_paths_to_model_filters_and_dedupes(qt_app: object, tmp_path: Path) -> None:
+    from conversion_queue import add_paths_to_model
     from ui_qt_file_model import ConversionFileTableModel
 
     supported = tmp_path / "doc.txt"

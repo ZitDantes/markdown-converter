@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-
-from PySide6.QtCore import QMimeData
+from typing import TYPE_CHECKING
 
 from utils import merge_file_lists
+
+if TYPE_CHECKING:
+    from PySide6.QtCore import QMimeData
 
 
 def paths_from_mime_urls(mime: QMimeData) -> list[Path]:

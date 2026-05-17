@@ -1,12 +1,15 @@
-"""File d'attente de conversion partagée (UI web et ancienne UI Qt widgets)."""
+"""File d'attente de conversion partagée (UI web)."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from converter import ConversionStatus, FileConversionRecord
-from ui_qt_file_model import ConversionFileTableModel
 from utils import is_supported_path
+
+if TYPE_CHECKING:
+    from ui_qt_file_model import ConversionFileTableModel
 
 
 def add_paths_to_model(model: ConversionFileTableModel, paths: list[Path]) -> list[Path]:
