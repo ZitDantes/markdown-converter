@@ -87,8 +87,11 @@ def _fail_tkinter(exc: BaseException | None = None) -> None:
 
 
 def _resolve_ui_choice() -> str:
-    """Lit ``MARKDOWN_CONVERTER_UI`` ; valeurs ignorées (typo, vide) → ``tk``."""
+    """Lit ``MARKDOWN_CONVERTER_UI`` ; valeurs ignorées (typo, vide) → ``tk`` (dev) ou ``web`` (bundle)."""
     raw = os.environ.get(UI_ENV_VAR, "").strip().lower()
+    if not raw and getattr(sys, "frozen", False):
+        # .app / onedir PyInstaller : défaut web (PLO-55), même sans LSEnvironment.
+        return UI_WEB
     if raw == UI_WEB_SPIKE:
         return UI_WEB_SPIKE
     if raw == UI_WEB:
@@ -136,7 +139,10 @@ def _resolve_web_fallback() -> str:
 def _try_run_web_ui() -> bool:
     """Tente l'UI web ; retourne ``False`` si indisponible (repli géré par ``main``)."""
     from ui_web_bootstrap import format_web_unavailable_message, probe_web_ui_availability
+    from ui_web_engine_env import configure_webengine_runtime_env
     from ui_web_shell import run_app as run_web_app
+
+    configure_webengine_runtime_env()
 
     avail = probe_web_ui_availability()
     if not avail.ok:

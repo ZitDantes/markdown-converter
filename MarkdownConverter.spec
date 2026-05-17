@@ -1,8 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-Fichier de build PyInstaller pour macOS (.app sans console).
-Usage : pyinstaller MarkdownConverter.spec
+Fichier de build PyInstaller pour macOS (.app) et Linux (dossier onedir).
+
+Usage :
+  ./scripts/build_web.sh
+  pyinstaller --noconfirm MarkdownConverter.spec
+
+PLO-55 : inclut Qt WebEngine, le front ``web/dist`` et l'UI web par défaut dans le bundle.
 """
+import sys
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
@@ -23,8 +31,28 @@ datas += magika_datas
 binaries += magika_binaries
 hiddenimports += magika_hidden
 
-# PLO-58 / v0.2 : modules UI Qt (pas collect_all PySide6 — évite WebEngine/QML ~1 Go).
+_web_dist = Path("web/dist")
+if not (_web_dist / "index.html").is_file():
+    raise SystemExit(
+        "ERREUR : web/dist/index.html absent.\n"
+        "Construisez le front : ./scripts/build_web.sh"
+    )
+datas += [(str(_web_dist), "web/dist")]
+
+# UI web (PLO-46+) + repli Qt widgets (PLO-54). Les hooks PyInstaller collectent
+# QtWebEngineProcess et les ressources via les hiddenimports WebEngine.
 hiddenimports += [
+    "ui_web_shell",
+    "ui_web_bootstrap",
+    "ui_web_loaders",
+    "ui_web_drop",
+    "bridge_contract",
+    "bridge_contract.models",
+    "bridge_contract.inspector_helpers",
+    "PySide6.QtWebEngineCore",
+    "PySide6.QtWebEngineWidgets",
+    "PySide6.QtWebChannel",
+    "PySide6.QtPrintSupport",
     "ui_qt",
     "ui_qt_conversion_worker",
     "ui_qt_file_model",
@@ -39,19 +67,16 @@ hiddenimports += [
 ]
 
 a = Analysis(
-    ["main.py", "ui_qt.py"],
+    ["main.py"],
     pathex=[],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=["packaging/pyi_rth_webengine.py"],
     excludes=[
-        # Modules Qt lourds ou inutiles pour l'UI widgets actuelle.
-        "PySide6.QtWebEngineCore",
-        "PySide6.QtWebEngineWidgets",
-        "PySide6.QtWebEngineQuick",
+        # Modules Qt lourds ou inutiles pour l'UI actuelle (WebEngine conservé).
         "PySide6.Qt3DAnimation",
         "PySide6.Qt3DCore",
         "PySide6.Qt3DExtras",
@@ -71,6 +96,14 @@ a = Analysis(
         "PySide6.QtNfc",
         "PySide6.QtSerialPort",
         "PySide6.QtWebSockets",
+        "PySide6.QtWebEngineQuick",
+        # Outils de dev tirés par markitdown / analyse — inutiles dans le bundle.
+        "pytest",
+        "_pytest",
+        "py",
+        "pygments",
+        "pluggy",
+        "iniconfig",
     ],
     noarchive=False,
 )
@@ -86,7 +119,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -101,22 +134,24 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name="Markdown Converter",
 )
 
-app = BUNDLE(
-    coll,
-    name="Markdown Converter.app",
-    icon=None,
-    bundle_identifier="io.github.zitdantes.markdownconverter",
-    info_plist={
-        "NSPrincipalClass": "NSApplication",
-        "NSHighResolutionCapable": "True",
-        # Interface Qt par défaut dans le bundle (équivalent MARKDOWN_CONVERTER_UI=qt).
-        "LSEnvironment": {
-            "MARKDOWN_CONVERTER_UI": "qt",
+if sys.platform == "darwin":
+    app = BUNDLE(
+        coll,
+        name="Markdown Converter.app",
+        icon=None,
+        bundle_identifier="io.github.zitdantes.markdownconverter",
+        info_plist={
+            "NSPrincipalClass": "NSApplication",
+            "NSHighResolutionCapable": "True",
+            "LSEnvironment": {
+                "MARKDOWN_CONVERTER_UI": "web",
+                "QTWEBENGINE_DISABLE_SANDBOX": "1",
+                "QTWEBENGINE_CHROMIUM_FLAGS": "--no-sandbox",
+            },
         },
-    },
-)
+    )

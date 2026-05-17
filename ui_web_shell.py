@@ -674,7 +674,9 @@ class WebShellWindow(QMainWindow):
 def run_app() -> None:
     """Lance l'UI web (PySide6 + WebEngine + build ``web/dist``)."""
     from ui_web_bootstrap import ensure_web_ui_ready
+    from ui_web_engine_env import configure_webengine_runtime_env
 
+    configure_webengine_runtime_env()
     ensure_web_ui_ready()
 
     from PySide6.QtWidgets import QApplication

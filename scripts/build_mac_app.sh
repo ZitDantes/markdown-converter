@@ -2,6 +2,8 @@
 # Construit l’application macOS (.app) avec PyInstaller et produit une archive ZIP
 # pour distribution (inclut un LISEZMOI).
 #
+# Prérequis : .venv, Node.js 20+ (build front), PySide6 + WebEngine (requirements-qt.txt).
+#
 # Usage :
 #   ./scripts/build_mac_app.sh              # archive horodatée (build interne, partage rapide)
 #   ./scripts/build_mac_app.sh v0.1.0       # archive nommée pour une GitHub Release
@@ -19,7 +21,12 @@ fi
 source .venv/bin/activate
 
 python3 -m pip install -q -r requirements.txt -r requirements-qt.txt pyinstaller
+
+echo "== Build front (web/dist) =="
+./scripts/build_web.sh
+
 rm -rf build dist
+echo "== PyInstaller (UI web + WebEngine) =="
 python3 -m PyInstaller --noconfirm MarkdownConverter.spec
 
 APP_NAME="Markdown Converter.app"
@@ -27,6 +34,14 @@ if [[ ! -d "dist/${APP_NAME}" ]]; then
   echo "Erreur : dist/${APP_NAME} introuvable après PyInstaller." >&2
   exit 1
 fi
+
+# PyInstaller laisse aussi un dossier onedir homonyme (~ même taille) : éviter la confusion.
+if [[ -d "dist/Markdown Converter" && ! -L "dist/Markdown Converter" ]]; then
+  rm -rf "dist/Markdown Converter"
+fi
+
+APP_SIZE="$(du -sh "dist/${APP_NAME}" | awk '{print $1}')"
+echo "Taille du .app (décompressé) : ${APP_SIZE}"
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
@@ -38,5 +53,10 @@ VERSION="${1:-$(date +%Y%m%d-%H%M)}"
 ZIP_NAME="MarkdownConverter-mac-${VERSION}.zip"
 ( cd "$STAGE" && zip -rq "$ROOT/$ZIP_NAME" . )
 
+ZIP_SIZE="$(du -sh "$ROOT/$ZIP_NAME" | awk '{print $1}')"
 echo "OK — archive prête pour distribution :"
 echo "  $ROOT/$ZIP_NAME"
+echo "  Taille ZIP : ${ZIP_SIZE} (limite GitHub Release : 100 Mo par fichier)"
+if [[ "${ZIP_SIZE}" == *G* ]] || { [[ "${ZIP_SIZE}" == *M* ]] && [[ "${ZIP_SIZE%%M*}" -gt 100 ]]; }; then
+  echo "Attention : l’archive dépasse peut‑être 100 Mo — vérifier avant une GitHub Release." >&2
+fi
