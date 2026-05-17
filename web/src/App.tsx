@@ -9,12 +9,15 @@ import type { ConversionMode } from "./components/toolbar/ConversionToolbar";
 import { filterQueueItems } from "./lib/queueFilters";
 import {
   computeBatchPercent,
-  countConversionResults,
   mergeSummaryIntoQueue,
   parseConversionFinishedPayload,
   parseJsonValue,
-  pollQueueUntilIdle,
+  waitForConversionIdle,
 } from "./lib/queueSync";
+import {
+  assertBackendSignals,
+  connectBackendSignal,
+} from "./lib/webChannelSignals";
 import { normalizeLogLevel, parseLogLine, type LogEntry } from "./lib/logJournal";
 import { useTheme } from "./theme/useTheme";
 import {
@@ -104,21 +107,22 @@ export function App() {
       try {
         const b = await connectBackend();
         if (cancelled) return;
+        assertBackendSignals(b);
         await pingBackend(b, "démarrage");
         appendLog("INFO", "Application prête.");
 
-        b.logEmitted?.connect((level, message) => {
-          appendLog(level, message);
+        connectBackendSignal(b, "logEmitted", (level, message) => {
+          appendLog(String(level), String(message));
         });
-        b.progressUpdated?.connect((progressJson) => {
+        connectBackendSignal(b, "progressUpdated", (progressJson) => {
           const ev = parseJsonValue<ProgressEvent>(progressJson);
           setBatchPercent(ev.batchPercent);
           scheduleQueueRefresh(b);
         });
-        b.queueUpdated?.connect((queueJson) => {
+        connectBackendSignal(b, "queueUpdated", (queueJson) => {
           applyQueueSnapshot(parseJsonValue<QueueState>(queueJson));
         });
-        b.conversionFinished?.connect((summaryJson) => {
+        connectBackendSignal(b, "conversionFinished", (summaryJson) => {
           setBatchPercent(1);
           try {
             const ev = parseConversionFinishedPayload(summaryJson);
@@ -130,13 +134,13 @@ export function App() {
           }
           void refreshQueue(b);
         });
-        b.conversionFailed?.connect(() => {
+        connectBackendSignal(b, "conversionFailed", () => {
           void refreshQueue(b);
         });
-        b.dropOverlayVisible?.connect((visible) => {
+        connectBackendSignal(b, "dropOverlayVisible", (visible) => {
           setDropOverlayVisible(Boolean(visible));
         });
-        b.pathsAdded?.connect(() => {
+        connectBackendSignal(b, "pathsAdded", () => {
           void refreshQueue(b);
         });
 
@@ -164,7 +168,7 @@ export function App() {
         clearTimeout(progressRefreshTimer);
       }
     };
-  }, [appendLog, applyQueueSnapshot, pushLog, refreshQueue]);
+  }, [appendLog, applyQueueSnapshot, refreshQueue]);
 
   const bridgeReady = status === "ready" && backend !== null;
   const items = queue?.items ?? [];
@@ -234,13 +238,8 @@ export function App() {
       appendLog("WARNING", ack.message ?? "Impossible de démarrer la conversion.");
       return;
     }
-    const modeLabel = strictMode ? "Strict" : "Standard";
-    const fileCount = items.length;
-    appendLog("INFO", `Conversion démarrée (${fileCount} fichier(s), mode ${modeLabel})…`);
-    const finalState = await pollQueueUntilIdle(backend, applyQueueSnapshot);
-    const { ok, err } = countConversionResults(finalState.items);
-    appendLog("INFO", `Conversion terminée : ${ok} réussi(s), ${err} erreur(s).`);
-    setBatchPercent(1);
+    const finalState = await waitForConversionIdle(backend, applyQueueSnapshot);
+    setBatchPercent(computeBatchPercent(finalState));
   };
 
   const onClear = async () => {
